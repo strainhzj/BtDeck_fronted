@@ -4,7 +4,8 @@ const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin')
 const name = 'BtDeck'
 
 module.exports = {
-  publicPath: process.env.NODE_ENV === 'production' ? '/btp-manager/' : '/',
+  // Docker部署使用根路径，如需子路径部署请修改此处
+  publicPath: process.env.NODE_ENV === 'production' ? '/' : '/',
   lintOnSave: false,
   pwa: {
     name: name
