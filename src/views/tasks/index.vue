@@ -2102,7 +2102,6 @@ ${this.selectedLog.logDetail}`
 
 /* 任务表单对话框样式 - 水平居中，垂直向上偏移170px */
 ::v-deep .task-dialog {
-  position: fixed;
   left: 50%;
   top: calc(10% - 170px);
   transform: translate(-50%, 0);
