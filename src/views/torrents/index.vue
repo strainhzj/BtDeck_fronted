@@ -651,7 +651,7 @@ export default class extends Vue {
   // 搜索相关
   private listQuery = {
     skip: 0,
-    limit: 20,
+    limit: 20,  // 初始默认值，会在 handlePageSizeChange 中动态更新
     name_like: '',
     downloader_id: '',
     status: '',
@@ -782,9 +782,10 @@ export default class extends Vue {
 
   // 清空搜索
   private handleClearFilter() {
+    // 🔥 修复：使用当前 pageSize，避免硬编码为 20
     this.listQuery = {
       skip: 0,
-      limit: 20,
+      limit: this.pageSize,  // 使用当前的 pageSize 值
       name_like: '',
       downloader_id: '',
       status: '',
@@ -804,6 +805,8 @@ export default class extends Vue {
   // 每页条数变更
   private handlePageSizeChange(newSize: number) {
     this.pageSize = newSize
+    // 🔥 修复：同步更新 listQuery.limit，确保 API 请求使用正确的分页大小
+    this.listQuery.limit = newSize
     // 重新计算当前页码，确保不会超出总页数
     const newTotalPages = Math.ceil(this.total / this.pageSize)
     if (this.currentPage > newTotalPages && newTotalPages > 0) {
@@ -1633,7 +1636,7 @@ export default class extends Vue {
 
       const request: any = {
         page: 1,
-        limit: this.listQuery.limit || 20,
+        limit: this.listQuery.limit || this.pageSize,  // 🔥 修复：使用 pageSize 作为后备值
         sort_by: searchParams.sort_by || this.listQuery.sort_by || 'added_date',
         sort_order: (searchParams.sort_order || this.listQuery.sort_order || 'desc') as 'asc' | 'desc'
       }
