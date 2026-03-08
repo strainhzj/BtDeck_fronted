@@ -43,6 +43,9 @@ Thumbs.db
 *.backup
 *~
 
+# Backup directories
+backup/
+
 # Temporary files
 *.tmp
 *.temp
