@@ -52,19 +52,10 @@
         <span class="switch-label">启用分时段限速</span>
         <el-switch
           v-model="enableScheduling"
-          :disabled="!capabilities.supports_speed_scheduling"
           active-color="#059669"
           inactive-color="#d1d5db"
         />
       </div>
-      <p v-if="!capabilities.supports_speed_scheduling" class="form-hint warning-hint">
-        <svg class="hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
-        </svg>
-        该下载器不支持分时段限速功能
-      </p>
     </div>
 
     <!-- 限速规则列表 -->
@@ -196,7 +187,7 @@
       <!-- 添加规则按钮 -->
       <el-button
         class="add-rule-btn"
-        :disabled="!enableScheduling || !capabilities.supports_speed_scheduling"
+        :disabled="!enableScheduling"
         @click="addRule"
       >
         <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

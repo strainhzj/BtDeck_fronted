@@ -82,6 +82,7 @@
 
       <!-- 清空回收站 -->
       <batch-button
+        v-if="false"
         type="danger"
         icon="el-icon-delete"
         tooltip="清空回收站"
