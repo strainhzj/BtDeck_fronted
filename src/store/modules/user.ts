@@ -97,13 +97,20 @@ class User extends VuexModule implements IUserState {
 
   @Action
   public async GetUserInfo() {
-    if (this.token === '') {
-      throw Error('GetUserInfo: token is undefined!')
+    // 🔧 防御性检查：更详细的 token 验证
+    if (!this.token || this.token.trim() === '') {
+      throw Error('Token为空，请重新登录')
     }
 
     try {
       // 尝试调用后端API获取用户信息
       const response = await getUserInfo({ token: this.token })
+
+      // 🔧 防御性检查：验证响应状态
+      if (response.code !== '200') {
+        throw Error(response.msg || '获取用户信息失败')
+      }
+
       if (!response || !response.data) {
         throw Error('Verification failed, please Login again.')
       }

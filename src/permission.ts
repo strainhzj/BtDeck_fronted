@@ -28,6 +28,11 @@ router.beforeEach(async(to: Route, from: Route, next: any) => {
       // Check whether the user has obtained his permission roles
       if (UserModule.roles.length === 0) {
         try {
+          // 🔧 防御性检查：确保 token 有效才调用 API
+          if (!UserModule.token || UserModule.token.trim() === '') {
+            throw new Error('Token为空，请重新登录')
+          }
+
           // Get user info, including roles
           await UserModule.GetUserInfo()
           // 用户信息获取成功后，直接放行到目标页面
