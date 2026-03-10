@@ -536,6 +536,8 @@ import {
   addTorrent,
   deleteTorrents,
   deleteTorrentsWithLevel,
+  deleteBatchAsync,
+  getBatchDeleteStatus,
   pauseTorrents,
   resumeTorrents,
   recheckTorrents,
@@ -1239,29 +1241,13 @@ export default class extends Vue {
    * @param level 删除等级 (1-4)
    */
   private async executeDeleteByLevel(torrents: any[], level: number) {
-    const loading = this.$loading({
-      lock: true,
-      text: '删除中...',
-      spinner: 'el-icon-loading',
-      background: 'rgba(0, 0, 0, 0.7)'
-    })
-
     try {
-      if (level === 3 || level === 4) {
-        // 调用新API: delete-with-level
-        await this.callDeleteWithLevelAPI(torrents, level)
-      } else {
-        // 调用旧API: deleteTorrents
-        const deleteData = level === 1 ? 1 : 0
-        await this.callDeleteLegacyAPI(torrents, deleteData)
-      }
+      // ✅ 统一使用新的异步批量删除接口（支持所有4个等级）
+      await this.callDeleteWithLevelAPI(torrents, level)
 
-      // 只在全部成功时显示成功消息
-      // callDeleteLegacyAPI 已经处理了失败情况，所以这里不需要额外处理
+      // 刷新列表
       this.getList()
     } catch (error: any) {
-      // 只处理未被 callDeleteLegacyAPI 处理的异常情况
-      // 例如等级3和4的错误情况
       const errorMessage = error?.response?.data?.msg ??
                            error?.message ??
                            '删除失败，请稍后重试'
@@ -1279,30 +1265,159 @@ export default class extends Vue {
       }
 
       this.$message.error(errorMessage)
+    }
+  }
+
+  /**
+   * 调用新的按等级删除API（等级1-4，使用异步批量删除）
+   * 优化：对于多个种子，使用异步批量删除接口，避免超时
+   */
+  private async callDeleteWithLevelAPI(torrents: any[], level: number) {
+    const infoIds = torrents.map(t => getTorrentId(t))
+
+    // 🔥 判断是否使用异步批量删除（种子数量 >= 2）
+    if (torrents.length >= 2) {
+      // 使用异步批量删除接口
+      const response = await deleteBatchAsync({
+        torrent_info_ids: infoIds,
+        delete_level: level,
+        operator: 'admin'
+      })
+
+      if (response.code !== '200') {
+        throw new Error(response.msg || '提交删除任务失败')
+      }
+
+      const taskId = response.data?.task_id
+      if (!taskId) {
+        throw new Error('未返回任务ID')
+      }
+
+      // 轮询查询任务状态（每5秒一次）
+      await this.pollDeleteTaskStatus(taskId, level)
+    } else {
+      // 单个种子：使用同步接口（保持原有逻辑）
+      const response = await deleteTorrentsWithLevel({
+        torrent_info_ids: infoIds,
+        delete_level: level,
+        operator: 'admin'
+      })
+
+      if (response.code !== '200') {
+        throw new Error(response.msg || '删除失败')
+      }
+
+      // 处理响应结果
+      this.handleDeleteResponse(response.data, level)
+    }
+  }
+
+  /**
+   * 轮询查询批量删除任务状态
+   * @param taskId 任务ID
+   * @param level 删除等级
+   */
+  private async pollDeleteTaskStatus(taskId: string, level: number) {
+    const pollInterval = 5000 // 每5秒轮询一次
+    const maxPollAttempts = 120 // 最大轮询次数（10分钟）
+    let pollAttempts = 0
+
+    // 显示进度提示
+    const loading = this.$loading({
+      lock: true,
+      text: '批量删除中，请稍候...',
+      spinner: 'el-icon-loading',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    try {
+      while (pollAttempts < maxPollAttempts) {
+        const response = await getBatchDeleteStatus(taskId)
+
+        if (response.code !== '200') {
+          throw new Error(response.msg || '查询任务状态失败')
+        }
+
+        const taskData = response.data
+
+        // 更新进度提示
+        if (taskData.status === 'running') {
+          const progress = taskData.success_count + taskData.failed_count
+          loading.text = `批量删除中... (${progress}/${taskData.total_count})`
+        }
+
+        // 检查任务是否完成
+        if (taskData.status === 'completed' || taskData.status === 'failed' || taskData.status === 'partial') {
+          // 任务完成，显示结果
+          this.handleDeleteTaskResult(taskData, level)
+          break
+        }
+
+        // 等待5秒后继续轮询
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+        pollAttempts++
+      }
+
+      if (pollAttempts >= maxPollAttempts) {
+        this.$message.warning('批量删除任务执行时间过长，请稍后查看任务状态')
+      }
     } finally {
       loading.close()
     }
   }
 
   /**
-   * 调用新的按等级删除API（等级3和4）
+   * 处理批量删除任务结果
+   * @param taskData 任务数据
+   * @param level 删除等级
    */
-  private async callDeleteWithLevelAPI(torrents: any[], level: number) {
-    const infoIds = torrents.map(t => getTorrentId(t))
+  private handleDeleteTaskResult(taskData: any, level: number) {
+    const { status, total_count, success_count, failed_count, failed_items } = taskData
 
-    const response = await deleteTorrentsWithLevel({
-      torrent_info_ids: infoIds,
-      delete_level: level,
-      operator: 'admin'
-    })
+    if (status === 'completed') {
+      // 全部成功
+      this.$message.success(`批量删除完成，成功删除 ${success_count} 个种子`)
+    } else if (status === 'failed') {
+      // 全部失败
+      this.$message.error(`批量删除失败：${taskData.error_message || '未知错误'}`)
+    } else if (status === 'partial') {
+      // 部分成功
+      this.$message.warning(`批量删除部分完成：成功 ${success_count} 个，失败 ${failed_count} 个`)
 
-    if (response.code !== '200') {
-      throw new Error(response.msg || '删除失败')
+      // 如果有失败的项，显示详情
+      if (failed_items && failed_items.length > 0) {
+        const failedNames = failed_items.slice(0, 5).map((item: any) => {
+          // 尝试从表格数据中找到种子名称
+          const torrent = this.tableData.find((t: any) => getTorrentId(t) === item.info_id)
+          return torrent?.name || item.info_id
+        }).join('、')
+
+        if (failed_items.length <= 5) {
+          this.$notify.warning({
+            title: '删除失败详情',
+            message: `以下种子删除失败：${failedNames}`,
+            duration: 5000
+          })
+        } else {
+          this.$notify.warning({
+            title: '删除失败详情',
+            message: `以下种子删除失败：${failedNames} 等${failed_items.length}个`,
+            duration: 5000
+          })
+        }
+      }
     }
+  }
 
+  /**
+   * 处理同步删除API响应结果
+   * @param data 响应数据
+   * @param level 删除等级
+   */
+  private handleDeleteResponse(data: any, level: number) {
     // 🔥 处理等级3删除的降级情况
-    if (level === 3 && response.data?.level4_downgraded && response.data.level4_downgraded.length > 0) {
-      const downgraded = response.data.level4_downgraded
+    if (level === 3 && data?.level4_downgraded && data.level4_downgraded.length > 0) {
+      const downgraded = data.level4_downgraded
 
       // 显示警告消息
       this.$message.warning(`已将 ${downgraded.length} 个种子降级为等级4删除（备份失败）`)
@@ -1326,22 +1441,20 @@ export default class extends Vue {
       }
     }
 
-    // 处理部分成功的情况 - 添加防御性检查
-    if (response.data?.failed && response.data.failed.length > 0) {
-      this.$message.warning(
-        `删除完成：失败 ${response.data.failed.length} 个`
-      )
+    // 处理部分成功的情况
+    if (data?.failed && data.failed.length > 0) {
+      this.$message.warning(`删除完成：失败 ${data.failed.length} 个`)
     }
 
     // 显示成功消息（降级情况已经在上面显示过，这里只显示完全成功的情况）
     const successCount =
-      (response.data?.level3_success?.length || 0) +
-      (response.data?.level4_success?.length || 0)
+      (data?.level3_success?.length || 0) +
+      (data?.level4_success?.length || 0)
 
-    if (successCount > 0 && !response.data?.level4_downgraded?.length) {
+    if (successCount > 0 && !data?.level4_downgraded?.length) {
       // 没有降级才显示成功消息
       if (level === 3) {
-        const level3Count = response.data?.level3_success?.length || 0
+        const level3Count = data?.level3_success?.length || 0
         this.$message.success(
           level3Count > 0
             ? `等级3删除成功 ${level3Count} 个`

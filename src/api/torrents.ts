@@ -260,6 +260,61 @@ export function deleteTorrentsWithLevel(data: DeleteWithLevelRequest): Promise<A
 }
 
 /**
+ * 异步批量删除种子（提交任务）
+ * @description 支持所有4个等级的删除，返回任务ID，需要轮询查询任务状态
+ */
+export interface BatchDeleteAsyncRequest {
+  torrent_info_ids: string[]
+  delete_level: number
+  operator?: string
+}
+
+export interface BatchDeleteAsyncResponse {
+  task_id: string
+  total_count: number
+  delete_level: number
+}
+
+export function deleteBatchAsync(data: BatchDeleteAsyncRequest): Promise<ApiResponse<BatchDeleteAsyncResponse>> {
+  return request({
+    url: '/torrents/delete-batch-async',
+    method: 'post',
+    data: data
+  }) as unknown as Promise<ApiResponse<BatchDeleteAsyncResponse>>
+}
+
+/**
+ * 查询批量删除任务状态
+ * @description 轮询此接口获取任务执行进度和结果
+ */
+export interface BatchDeleteStatusResponse {
+  task_id: string
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'partial'
+  total_count: number
+  success_count: number
+  failed_count: number
+  error_message?: string
+  created_time?: string
+  started_time?: string
+  completed_time?: string
+  results: Array<{
+    info_id: string
+    result: any
+  }>
+  failed_items: Array<{
+    info_id: string
+    error: string
+  }>
+}
+
+export function getBatchDeleteStatus(taskId: string): Promise<ApiResponse<BatchDeleteStatusResponse>> {
+  return request({
+    url: `/torrents/delete-batch-status/${taskId}`,
+    method: 'get'
+  }) as unknown as Promise<ApiResponse<BatchDeleteStatusResponse>>
+}
+
+/**
  * 暂停种子
  * @description 支持批量暂停多个下载器的种子，前端会自动分组调用
  */
