@@ -1447,7 +1447,10 @@ export default class extends Vue {
     }
 
     // 显示成功消息（降级情况已经在上面显示过，这里只显示完全成功的情况）
+    // ✅ 统计所有等级的成功数量（包括 level 1/2）
     const successCount =
+      (data?.level1_success?.length || 0) +
+      (data?.level2_success?.length || 0) +
       (data?.level3_success?.length || 0) +
       (data?.level4_success?.length || 0)
 
@@ -1460,6 +1463,10 @@ export default class extends Vue {
             ? `等级3删除成功 ${level3Count} 个`
             : `删除完成，成功 ${successCount} 个`
         )
+      } else if (level === 2) {
+        this.$message.success(`等级2删除完成，成功 ${successCount} 个`)
+      } else if (level === 1) {
+        this.$message.success(`等级1删除完成，成功 ${successCount} 个`)
       } else {
         this.$message.success(`删除完成，成功 ${successCount} 个`)
       }
