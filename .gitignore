@@ -30,6 +30,9 @@ logs/
 *.log
 *.log.*
 
+# 例外：保留源代码中的 logs 目录
+!src/views/logs/
+
 # Testing
 coverage/
 .nyc_output/
