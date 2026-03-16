@@ -739,10 +739,10 @@ export default class extends Vue {
 
       // 处理数组参数：转换为逗号分隔的字符串
       if (params.downloader_id && Array.isArray(params.downloader_id)) {
-        params.downloader_id = params.downloader_id.join(',') as any
+        params.downloader_id = params.downloader_id.join(',')
       }
       if (params.status && Array.isArray(params.status)) {
-        params.status = params.status.join(',') as any
+        params.status = params.status.join(',')
       }
 
       // 移除空值

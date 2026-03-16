@@ -136,7 +136,7 @@ export interface ApiResponse<T = any> {
  * 获取种子列表
  */
 export interface TorrentListParams {
-  downloader_id?: string
+  downloader_id?: string | string[]  // 支持单个ID或ID数组
   downloader_name_like?: string
   name_like?: string
   save_path_like?: string
@@ -149,7 +149,7 @@ export interface TorrentListParams {
   tags_like?: string
   category_like?: string
   tracker_like?: string
-  status?: string // 支持逗号分隔的多状态
+  status?: string | string[]  // 支持单个状态或状态数组
   skip?: number
   limit?: number
   sort_by?: string
