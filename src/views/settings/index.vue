@@ -341,7 +341,7 @@ export default class extends Vue {
   private confirmPass = ''
   private passwordFormChange = {
     name: '',
-    userId: 1,
+    userId: '',
     new_password: '',
     old_password: ''
   }
@@ -651,7 +651,7 @@ export default class extends Vue {
   // 确认修改密码
   private async changePassword() {
     if (this.confirmPass !== this.passwordFormChange.new_password) {
-      Message({
+      this.$message({
         message: '两次输入的密码不一致',
         type: 'warning',
         duration: 3000
@@ -659,14 +659,24 @@ export default class extends Vue {
       return
     }
 
+    // 检查 userId 是否存在
+    if (!UserModule.userId) {
+      this.$message({
+        message: '用户信息获取失败，请重新登录',
+        type: 'error',
+        duration: 3000
+      })
+      return
+    }
+
     try {
       await changePassword({
-        ...this.passwordFormChange,
+        userId: String(UserModule.userId), // 确保userId是字符串类型
         new_password: window.btoa(this.passwordFormChange.new_password),
         old_password: window.btoa(this.passwordFormChange.old_password)
       })
 
-      Message({
+      this.$message({
         message: '密码修改成功',
         type: 'success',
         duration: 3000
@@ -674,7 +684,7 @@ export default class extends Vue {
 
       this.cancelPasswordChange()
     } catch (error) {
-      Message({
+      this.$message({
         message: '密码修改失败',
         type: 'error',
         duration: 3000
