@@ -15,7 +15,9 @@
           v-model="listQuery.downloader_id"
           placeholder="全部下载器"
           clearable
-          style="width: 150px;"
+          multiple
+          collapse-tags
+          style="width: 200px;"
           class="search-select"
           filterable
         >
@@ -30,7 +32,9 @@
           v-model="listQuery.status"
           placeholder="全部状态"
           clearable
-          style="width: 120px;"
+          multiple
+          collapse-tags
+          style="width: 180px;"
           class="search-select"
         >
         <el-option
@@ -655,8 +659,8 @@ export default class extends Vue {
     skip: 0,
     limit: 20,  // 初始默认值，会在 handlePageSizeChange 中动态更新
     name_like: '',
-    downloader_id: '',
-    status: '',
+    downloader_id: [] as string[],  // 支持多选
+    status: [] as string[],         // 支持多选
     sort_by: 'added_date',
     sort_order: 'desc'
   }
@@ -732,6 +736,16 @@ export default class extends Vue {
     this.listLoading = true
     try {
       const params = { ...this.listQuery }
+
+      // 处理数组参数：转换为逗号分隔的字符串
+      if (params.downloader_id && Array.isArray(params.downloader_id)) {
+        params.downloader_id = params.downloader_id.join(',') as any
+      }
+      if (params.status && Array.isArray(params.status)) {
+        params.status = params.status.join(',') as any
+      }
+
+      // 移除空值
       Object.keys(params).forEach(key => {
         const value = params[key as keyof typeof params]
         if (value === '' || value === null || value === undefined) {
@@ -789,8 +803,8 @@ export default class extends Vue {
       skip: 0,
       limit: this.pageSize,  // 使用当前的 pageSize 值
       name_like: '',
-      downloader_id: '',
-      status: '',
+      downloader_id: [],  // 清空为空数组
+      status: [],         // 清空为空数组
       sort_by: 'added_date',
       sort_order: 'desc'
     }
@@ -1863,10 +1877,18 @@ export default class extends Vue {
   private async handleShowDuplicateTorrents() {
     this.listLoading = true
     try {
+      // 处理数组参数：转换为逗号分隔的字符串
+      const downloaderIdParam = this.listQuery.downloader_id && this.listQuery.downloader_id.length > 0
+        ? this.listQuery.downloader_id.join(',')
+        : undefined
+      const statusParam = this.listQuery.status && this.listQuery.status.length > 0
+        ? this.listQuery.status.join(',')
+        : undefined
+
       const params = {
         name_like: this.listQuery.name_like || undefined,
-        downloader_id: this.listQuery.downloader_id || undefined,
-        status: this.listQuery.status || undefined,
+        downloader_id: downloaderIdParam,
+        status: statusParam,
         page: this.currentPage,
         pageSize: this.pageSize
       }
@@ -1915,6 +1937,24 @@ export default class extends Vue {
 
 <style lang="scss" scoped>
 @import '@/styles/torrent-theme.scss';
+
+// ========================================
+// 多选下拉框样式优化
+// ========================================
+.search-select {
+  // 优化多选标签样式
+  ::v-deep .el-tag {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  // 优化下拉框宽度自适应
+  ::v-deep .el-select__tags {
+    max-width: calc(100% - 30px);
+  }
+}
 
 // ========================================
 // 列设置弹框补充样式
