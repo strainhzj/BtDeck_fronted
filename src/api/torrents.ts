@@ -115,7 +115,43 @@ export interface TorrentAddRequest {
   is_first_last_piece_priority?: boolean
   upload_limit?: number | string
   download_limit?: number | string
-  added_date?: number // Unix timestamp integer
+}
+
+/**
+ * 批量添加种子请求
+ */
+export interface TorrentsAddBatchRequest {
+  torrent_files: File[]
+  downloader_id: string
+  save_path: string
+  category?: string
+  tags?: string
+  paused?: boolean
+  skip_hash_check?: boolean
+  is_sequential_download?: boolean
+  is_first_last_piece_priority?: boolean
+  upload_limit?: number | string
+  download_limit?: number | string
+}
+
+/**
+ * 批量添加种子单个结果
+ */
+export interface TorrentAddBatchResultItem {
+  file_name: string
+  success: boolean
+  info_id: string | null
+  error: string | null
+}
+
+/**
+ * 批量添加种子响应数据
+ */
+export interface TorrentAddBatchResponseData {
+  total: number
+  success_count: number
+  failed_count: number
+  results: TorrentAddBatchResultItem[]
 }
 
 export interface TorrentDeleteRequest {
@@ -219,6 +255,57 @@ export function addTorrent(data: TorrentAddRequest): Promise<ApiResponse<any>> {
       'Content-Type': 'multipart/form-data'
     }
   }) as unknown as Promise<ApiResponse<any>>
+}
+
+/**
+ * 批量添加种子
+ */
+export function addTorrentsBatch(data: TorrentsAddBatchRequest): Promise<ApiResponse<TorrentAddBatchResponseData>> {
+  const formData = new FormData()
+
+  // 添加所有种子文件
+  data.torrent_files.forEach(file => {
+    formData.append('torrent_files', file)
+  })
+
+  // 必填字段
+  formData.append('downloader_id', data.downloader_id)
+  formData.append('save_path', data.save_path)
+
+  // 可选字段
+  if (data.category) {
+    formData.append('category', data.category)
+  }
+  if (data.tags) {
+    formData.append('tags', data.tags)
+  }
+  if (data.paused !== undefined) {
+    formData.append('paused', data.paused ? '1' : '0')
+  }
+  if (data.skip_hash_check !== undefined) {
+    formData.append('skip_hash_check', data.skip_hash_check ? '1' : '0')
+  }
+  if (data.is_sequential_download !== undefined) {
+    formData.append('is_sequential_download', data.is_sequential_download ? '1' : '0')
+  }
+  if (data.is_first_last_piece_priority !== undefined) {
+    formData.append('is_first_last_piece_priority', data.is_first_last_piece_priority ? '1' : '0')
+  }
+  if (data.upload_limit !== undefined) {
+    formData.append('upload_limit', data.upload_limit.toString())
+  }
+  if (data.download_limit !== undefined) {
+    formData.append('download_limit', data.download_limit.toString())
+  }
+
+  return request({
+    url: '/torrents/add-batch',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  }) as unknown as Promise<ApiResponse<TorrentAddBatchResponseData>>
 }
 
 /**
