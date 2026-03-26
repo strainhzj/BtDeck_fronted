@@ -114,6 +114,14 @@
                   @change="onFieldChange(condition)"
                   style="width: 140px;"
                 >
+                  <el-option-group label="高级信息">
+                    <el-option
+                      v-for="field in advancedFields"
+                      :key="field.key"
+                      :label="field.label"
+                      :value="field.key"
+                    />
+                  </el-option-group>
                   <el-option-group label="基本信息">
                     <el-option
                       v-for="field in basicFields"
@@ -138,9 +146,9 @@
                       :value="field.key"
                     />
                   </el-option-group>
-                  <el-option-group label="高级信息">
+                  <el-option-group label="比率信息">
                     <el-option
-                      v-for="field in advancedFields"
+                      v-for="field in ratioFields"
                       :key="field.key"
                       :label="field.label"
                       :value="field.key"
@@ -446,11 +454,15 @@ export default class AdvancedSearchBuilder extends Vue {
 
   // 高级信息字段
   readonly advancedFields: SearchField[] = [
-    { key: 'ratio', label: '比率', type: 'number', supportsExclude: true },
-    { key: 'ratio_limit', label: '比率限制', type: 'number', supportsExclude: true },
     { key: 'tags', label: '标签', type: 'multiSelect', supportsExclude: true },
     { key: 'tracker_url', label: 'Tracker URL', type: 'text', supportsExclude: true },
     { key: 'tracker_msg', label: 'Tracker 信息', type: 'text', supportsExclude: true }
+  ]
+
+  // 比率信息字段
+  readonly ratioFields: SearchField[] = [
+    { key: 'ratio', label: '比率', type: 'number', supportsExclude: true },
+    { key: 'ratio_limit', label: '比率限制', type: 'number', supportsExclude: true }
   ]
 
   // 操作符定义（统一配置：包含前端标识、后端格式、降级策略）
@@ -710,10 +722,11 @@ export default class AdvancedSearchBuilder extends Vue {
   // 获取字段信息
   private getFieldInfo(fieldKey: string): SearchField | undefined {
     const allFields = [
+      ...this.advancedFields,
       ...this.basicFields,
       ...this.statusFields,
       ...this.timeFields,
-      ...this.advancedFields
+      ...this.ratioFields
     ]
     return allFields.find(field => field.key === fieldKey)
   }

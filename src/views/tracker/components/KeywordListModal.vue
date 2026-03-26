@@ -500,6 +500,9 @@ export default class KeywordListModal extends Vue {
 }
 
 .batch-actions {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   padding: 16px 20px;
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
