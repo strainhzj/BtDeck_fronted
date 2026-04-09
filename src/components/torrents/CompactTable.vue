@@ -227,14 +227,7 @@
 </template>
 
 <script lang="ts">
-import { getTorrentList } from '@/api/torrents'
-
-// 声明$http类型
-declare module 'vue/types/vue' {
-  interface Vue {
-    $http: any
-  }
-}
+import { getTorrentList, pauseTorrents, resumeTorrents, deleteTorrents } from '@/api/torrents'
 
 // 工具函数
 function formatSize(bytes: number): string {
@@ -483,7 +476,11 @@ export default {
 
     async handleStart(torrent: any) {
       try {
-        const response = await this.$http.post('/api/v1/torrents/start', { info_id: torrent.info_id })
+        // 使用 resumeTorrents API 开始下载
+        const response = await resumeTorrents({
+          downloader_id: torrent.downloader_id,
+          hashes: [torrent.hash]
+        })
         if (response.status === 'success') {
           this.$message.success('开始下载成功')
           this.handleRefresh()
@@ -498,7 +495,11 @@ export default {
 
     async handlePause(torrent: any) {
       try {
-        const response = await this.$http.post('/api/v1/torrents/pause', { info_id: torrent.info_id })
+        // 使用 pauseTorrents API 暂停种子
+        const response = await pauseTorrents({
+          downloader_id: torrent.downloader_id,
+          hashes: [torrent.hash]
+        })
         if (response.status === 'success') {
           this.$message.success('暂停成功')
           this.handleRefresh()
@@ -513,7 +514,11 @@ export default {
 
     async handleResume(torrent: any) {
       try {
-        const response = await this.$http.post('/api/v1/torrents/resume', { info_id: torrent.info_id })
+        // 使用 resumeTorrents API 恢复种子
+        const response = await resumeTorrents({
+          downloader_id: torrent.downloader_id,
+          hashes: [torrent.hash]
+        })
         if (response.status === 'success') {
           this.$message.success('恢复成功')
           this.handleRefresh()
@@ -528,7 +533,13 @@ export default {
 
     async handleDelete(torrent: any) {
       try {
-        const response = await this.$http.delete(`/api/v1/torrents/${torrent.info_id}`)
+        // 使用 deleteTorrents API 删除种子
+        const response = await deleteTorrents({
+          info_id: torrent.info_id,
+          downloader_id: torrent.downloader_id,
+          delete_data: 0,
+          id_recycle: 1
+        })
         if (response.status === 'success') {
           this.$message.success('删除成功')
           this.handleRefresh()
@@ -568,9 +579,9 @@ export default {
         this.batchOperationLoading = true  // 开始加载
 
         // 修复：使用 this.multipleSelection 而不是 undefined 的 selectedItems
-        const infoIds = this.multipleSelection.map((item: any) => item.info_id)
+        const selectedItems = this.multipleSelection
 
-        if (infoIds.length === 0) {
+        if (selectedItems.length === 0) {
           this.$message.warning('请先选择要操作的种子')
           return
         }
@@ -586,20 +597,69 @@ export default {
 
         if (this.batchOperation === 'delete') {
           // 使用批量删除API
-          response = await this.$http.post('/api/v1/torrents/delete/bulk', {
-            torrent_info_ids: infoIds,
-            delete_option: this.deleteDataCheckbox ? 'delete_files_and_torrent' : 'delete_only_torrent',
-            safety_check_level: 'basic',
-            force_delete: false
-          })
+          // 注意：需要按下载器分组，因为批量删除API需要下载器ID
+          const downloaderGroups = selectedItems.reduce((groups: any, item: any) => {
+            const downloaderId = item.downloader_id
+            if (!groups[downloaderId]) {
+              groups[downloaderId] = []
+            }
+            groups[downloaderId].push(item.info_id)
+            return groups
+          }, {})
+
+          // 对每个下载器执行批量删除
+          const promises = Object.keys(downloaderGroups).map(downloaderId =>
+            deleteTorrents({
+              info_id: downloaderGroups[downloaderId][0], // 批量删除API会处理多个
+              downloader_id: downloaderId,
+              delete_data: this.deleteDataCheckbox ? 1 : 0,
+              id_recycle: 1
+            })
+          )
+          const results = await Promise.all(promises)
+          response = results[0] // 使用第一个结果作为判断
         } else if (this.batchOperation === 'pause') {
-          response = await this.$http.post('/api/v1/torrents/pause', { info_ids: infoIds })
+          // 按下载器分组执行暂停操作
+          const downloaderGroups = selectedItems.reduce((groups: any, item: any) => {
+            const downloaderId = item.downloader_id
+            if (!groups[downloaderId]) {
+              groups[downloaderId] = []
+            }
+            groups[downloaderId].push(item.hash)
+            return groups
+          }, {})
+
+          const promises = Object.keys(downloaderGroups).map(downloaderId =>
+            pauseTorrents({
+              downloader_id: downloaderId,
+              hashes: downloaderGroups[downloaderId]
+            })
+          )
+          const results = await Promise.all(promises)
+          response = results[0]
         } else if (this.batchOperation === 'resume') {
-          response = await this.$http.post('/api/v1/torrents/resume', { info_ids: infoIds })
+          // 按下载器分组执行恢复操作
+          const downloaderGroups = selectedItems.reduce((groups: any, item: any) => {
+            const downloaderId = item.downloader_id
+            if (!groups[downloaderId]) {
+              groups[downloaderId] = []
+            }
+            groups[downloaderId].push(item.hash)
+            return groups
+          }, {})
+
+          const promises = Object.keys(downloaderGroups).map(downloaderId =>
+            resumeTorrents({
+              downloader_id: downloaderId,
+              hashes: downloaderGroups[downloaderId]
+            })
+          )
+          const results = await Promise.all(promises)
+          response = results[0]
         }
 
         if (response && response.status === 'success') {
-          this.$message.success(`成功${operationText}${infoIds.length}个种子`)
+          this.$message.success(`成功${operationText}${selectedItems.length}个种子`)
           this.handleRefresh()
           this.showBatchDialog = false
           this.deleteDataCheckbox = false  // 重置复选框

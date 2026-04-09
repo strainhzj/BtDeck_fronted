@@ -894,6 +894,7 @@ import {
   TaskLog,
   TaskLogQueryParams
 } from '@/api/tasks'
+import request from '@/utils/request'
 
 // 导入新创建的组件
 import MonacoEditor from '@/components/tasks/MonacoEditor.vue'
@@ -1932,17 +1933,21 @@ ${this.selectedLog.logDetail}`
   private async previewCleanup() {
     try {
       this.previewLoading = true
-      const response = await this.$http.post('/api/tasks/cleanup/preview', {
-        cleanup_level_3: this.cleanupConfig.cleanup_level_3,
-        cleanup_level_4: this.cleanupConfig.cleanup_level_4,
-        days_threshold: this.cleanupConfig.days_threshold
+      const response = await request({
+        url: '/cronTasks/cleanup/preview',
+        method: 'post',
+        data: {
+          cleanup_level_3: this.cleanupConfig.cleanup_level_3,
+          cleanup_level_4: this.cleanupConfig.cleanup_level_4,
+          days_threshold: this.cleanupConfig.days_threshold
+        }
       })
 
-      if (response.data.code === '200') {
-        this.showPreviewDialog(response.data.data)
+      if (response.code === '200') {
+        this.showPreviewDialog(response.data)
       } else {
         // 更友好的错误提示
-        const errorMsg = response.data.msg || '预览失败，请稍后重试'
+        const errorMsg = response.msg || '预览失败，请稍后重试'
         this.$message.error({
           message: errorMsg,
           duration: 5000,
@@ -1950,7 +1955,7 @@ ${this.selectedLog.logDetail}`
         })
         // 开发环境记录详细错误信息
         if (process.env.NODE_ENV === 'development') {
-          console.warn('清理预览API返回错误:', response.data)
+          console.warn('清理预览API返回错误:', response)
         }
       }
     } catch (error) {
