@@ -341,6 +341,7 @@
               <th>Announce信息</th>
               <th style="width: 100px;">Scrape状态</th>
               <th>Scrape信息</th>
+              <th style="width: 80px;">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -376,6 +377,16 @@
                 </span>
               </td>
               <td>{{ tracker.last_scrape_msg || tracker.lastScrapeMsg || '-' }}</td>
+              <td>
+                <el-button
+                  type="text"
+                  size="small"
+                  :loading="tracker.reannouncing"
+                  @click="handleTrackerReannounce(tracker, index)"
+                >
+                  汇报
+                </el-button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -548,7 +559,8 @@ import {
   advancedSearch,
   getDuplicateTorrents,
   getDownloaderList,
-  DownloaderSimple
+  DownloaderSimple,
+  reannounceTorrents
 } from '@/api/torrents'
 import { TorrentStatus } from '@/types/torrent'
 import { STATUS_OPTIONS, getStatusIcon, getStatusText } from '@/constants/status-config'
@@ -898,6 +910,36 @@ export default class extends Vue {
 
     // 中性状态
     return 'tracker-status-neutral'
+  }
+
+  /**
+   * 处理单个Tracker的汇报操作
+   */
+  private async handleTrackerReannounce(tracker: any, index: number) {
+    if (!this.currentRow) return
+
+    // 设置loading状态
+    this.$set(tracker, 'reannouncing', true)
+
+    try {
+      const response = await reannounceTorrents({
+        hashes: [this.currentRow.hash]
+      })
+
+      if (response.code === '200') {
+        this.$message.success(`Tracker汇报成功`)
+        // 刷新种子列表
+        await this.getTorrentListData()
+      } else {
+        this.$message.error(response.msg || 'Tracker汇报失败')
+      }
+    } catch (error) {
+      console.error('Tracker汇报失败:', error)
+      this.$message.error('Tracker汇报失败')
+    } finally {
+      // 清除loading状态
+      this.$set(tracker, 'reannouncing', false)
+    }
   }
 
   // 批量操作

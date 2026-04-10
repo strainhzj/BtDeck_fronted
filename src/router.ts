@@ -145,6 +145,15 @@ const router = new Router({
           }
         },
         {
+          path: 'reannounce-config',
+          component: () => import(/* webpackChunkName: "tracker-reannounce-config" */ '@/views/tracker/reannounce-config.vue'),
+          meta: {
+            keepAlive: true,
+            title: '汇报配置',
+            icon: 'setting'
+          }
+        },
+        {
           path: 'test',
           component: () => import(/* webpackChunkName: "tracker-test" */ '@/views/tracker/test.vue'),
           meta: {

@@ -446,3 +446,111 @@ export function searchAllPools(params?: SearchAllPoolsParams): Promise<ApiRespon
     params
   }) as unknown as Promise<ApiResponse<PaginatedResponse<SearchResultItem>>>
 }
+
+// ==================== Tracker汇报配置API ====================
+
+/**
+ * Tracker汇报配置
+ */
+export interface TrackerReannounceConfig {
+  config_id: string
+  domain_pattern: string
+  domain_display_name: string
+  interval_minutes: number
+  enabled: boolean
+  last_reannounce_time?: string
+  create_time?: string
+  update_time?: string
+}
+
+/**
+ * 汇报配置列表查询参数
+ */
+export interface ReannounceConfigListParams {
+  domain_display_name?: string
+  enabled?: boolean
+  page?: number
+  page_size?: number
+}
+
+/**
+ * 创建汇报配置请求
+ */
+export interface CreateReannounceConfigRequest {
+  domain_pattern: string
+  domain_display_name?: string
+  interval_minutes: number
+  enabled: boolean
+}
+
+/**
+ * 更新汇报配置请求
+ */
+export interface UpdateReannounceConfigRequest {
+  domain_pattern?: string
+  domain_display_name?: string
+  interval_minutes?: number
+  enabled?: boolean
+}
+
+/**
+ * 自动检测域名响应
+ */
+export interface AutoDetectDomainsResponse {
+  detected: number
+  created: number
+  configs: TrackerReannounceConfig[]
+}
+
+/**
+ * 获取汇报配置列表
+ */
+export function getReannounceConfigs(params?: ReannounceConfigListParams): Promise<ApiResponse<PaginatedResponse<TrackerReannounceConfig>>> {
+  return request({
+    url: '/tracker-reannounce/configs',
+    method: 'get',
+    params
+  }) as unknown as Promise<ApiResponse<PaginatedResponse<TrackerReannounceConfig>>>
+}
+
+/**
+ * 创建汇报配置
+ */
+export function createReannounceConfig(data: CreateReannounceConfigRequest): Promise<ApiResponse<TrackerReannounceConfig>> {
+  return request({
+    url: '/tracker-reannounce/configs',
+    method: 'post',
+    data
+  }) as unknown as Promise<ApiResponse<TrackerReannounceConfig>>
+}
+
+/**
+ * 更新汇报配置
+ */
+export function updateReannounceConfig(configId: string, data: UpdateReannounceConfigRequest): Promise<ApiResponse<TrackerReannounceConfig>> {
+  return request({
+    url: `/tracker-reannounce/configs/${configId}`,
+    method: 'put',
+    data
+  }) as unknown as Promise<ApiResponse<TrackerReannounceConfig>>
+}
+
+/**
+ * 删除汇报配置
+ */
+export function deleteReannounceConfig(configId: string): Promise<ApiResponse<any>> {
+  return request({
+    url: `/tracker-reannounce/configs/${configId}`,
+    method: 'delete'
+  }) as unknown as Promise<ApiResponse<any>>
+}
+
+/**
+ * 自动检测域名
+ */
+export function autoDetectDomains(): Promise<ApiResponse<AutoDetectDomainsResponse>> {
+  return request({
+    url: '/tracker-reannounce/configs/auto-detect',
+    method: 'post'
+  }) as unknown as Promise<ApiResponse<AutoDetectDomainsResponse>>
+}

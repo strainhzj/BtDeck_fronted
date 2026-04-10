@@ -1077,3 +1077,54 @@ export function setTorrentLocation(data: SetLocationRequest): Promise<ApiRespons
     data
   }) as unknown as Promise<ApiResponse<SetLocationResponse>>
 }
+
+// ==================== Tracker汇报API ====================
+
+/**
+ * Tracker汇报请求参数
+ */
+export interface ReannounceRequest {
+  hashes?: string[]  // 种子hash列表
+  downloader_id?: string | number  // 下载器ID
+}
+
+/**
+ * Tracker汇报响应
+ */
+export interface ReannounceResponse {
+  success_count: number
+  failed_count: number
+  message: string
+}
+
+/**
+ * Tracker汇报（选中种子）
+ */
+export function reannounceTorrents(data: ReannounceRequest): Promise<ApiResponse<ReannounceResponse>> {
+  return request({
+    url: '/torrent-status/reannounce',
+    method: 'post',
+    data
+  }) as unknown as Promise<ApiResponse<ReannounceResponse>>
+}
+
+/**
+ * Tracker汇报（按下载器）
+ */
+export function reannounceByDownloader(downloaderId: string | number): Promise<ApiResponse<ReannounceResponse>> {
+  return request({
+    url: '/torrent-status/reannounce-by-downloader',
+    method: 'post',
+    data: { downloader_id: downloaderId }
+  }) as unknown as Promise<ApiResponse<ReannounceResponse>>
+}
+
+/**
+ * Tracker汇报（全局）
+ */
+export function reannounceAll(): Promise<ApiResponse<ReannounceResponse>> {
+  return request({
+    url: '/torrent-status/reannounce-all',
+    method: 'post'
+  }) as unknown as Promise<ApiResponse<ReannounceResponse>>
+}
