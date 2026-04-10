@@ -21,7 +21,8 @@
     "test:playwright:chrome": "node tests/run-playwright-tests.js --browser chromium",
     "test:playwright:firefox": "node tests/run-playwright-tests.js --browser firefox",
     "test:playwright:safari": "node tests/run-playwright-tests.js --browser webkit",
-    "test:playwright:report": "node tests/run-playwright-tests.js --skip-report"
+    "test:playwright:report": "node tests/run-playwright-tests.js --skip-report",
+    "lint:vuex-action": "node scripts/lint-vuex-action.js"
   },
   "dependencies": {
     "autoprefixer": "^10.4.22",
