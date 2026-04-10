@@ -91,6 +91,9 @@
       border
       fit
       highlight-current-row
+      :cell-style="cellStyle"
+      :header-cell-style="headerCellStyle"
+      header-row-class-name="reannounce-table-header"
       style="width: 100%;"
     >
       <el-table-column label="域名显示名称" min-width="150" show-overflow-tooltip>
@@ -117,12 +120,6 @@
             :value="row.enabled"
             @change="handleToggleEnabled(row)"
           />
-        </template>
-      </el-table-column>
-
-      <el-table-column label="最后汇报时间" width="160" align="center">
-        <template slot-scope="{row}">
-          <span>{{ row.last_reannounce_time || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -272,6 +269,22 @@ export default {
     this.getList()
   },
   methods: {
+    cellStyle({ columnIndex }) {
+      // 在操作列(第5列，索引4)添加左边框，使其在固定列上方显示
+      if (columnIndex === 4) {
+        return { borderLeft: '1px solid #DCDFE6' }
+      }
+      return null
+    },
+
+    headerCellStyle({ columnIndex }) {
+      // 表头同样在操作列添加左边框
+      if (columnIndex === 4) {
+        return { borderLeft: '1px solid #DCDFE6' }
+      }
+      return null
+    },
+
     getList() {
       this.listLoading = true
       getReannounceConfigs(this.listQuery).then(response => {
@@ -538,5 +551,18 @@ export default {
   color: #909399;
   margin-top: 8px;
   margin-bottom: 0;
+}
+
+/* 表格表头渐变背景样式 */
+::v-deep .reannounce-table-header {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+  border-bottom: 2px solid var(--color-primary);
+
+  th {
+    background: transparent;
+    font-weight: var(--font-weight-semibold);
+    color: white;
+    border-bottom: none;
+  }
 }
 </style>
