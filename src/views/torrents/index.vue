@@ -916,7 +916,10 @@ export default class extends Vue {
    * 处理单个Tracker的汇报操作
    */
   private async handleTrackerReannounce(tracker: any, index: number) {
-    if (!this.currentRow) return
+    if (!this.currentRow?.hash) {
+      this.$message.error('种子信息不完整，无法汇报')
+      return  // ✅ 修复：添加hash检查
+    }
 
     // 设置loading状态
     this.$set(tracker, 'reannouncing', true)

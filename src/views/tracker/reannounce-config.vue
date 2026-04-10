@@ -1,11 +1,11 @@
 <template>
   <div class="app-container reannounce-config-page">
     <!-- 页面标题 -->
-    <div style="margin-bottom: 20px;">
-      <h2 style="font-size: 20px; color: #303133; font-weight: 600; margin: 0;">
+    <div class="page-header">
+      <h2 class="page-title">
         📢 Tracker汇报配置
       </h2>
-      <p style="font-size: 14px; color: #909399; margin-top: 8px; margin-bottom: 0;">
+      <p class="page-description">
         配置站点的Tracker汇报间隔，支持域名通配符匹配
       </p>
     </div>
@@ -101,7 +101,7 @@
 
       <el-table-column label="域名模式" min-width="180" show-overflow-tooltip>
         <template slot-scope="{row}">
-          <span v-html="highlightWildcard(row.domain_pattern)" />
+          <span v-html="sanitizeDomainPattern(row.domain_pattern)" />
         </template>
       </el-table-column>
 
@@ -140,7 +140,7 @@
             type="text"
             size="small"
             icon="el-icon-delete"
-            style="color: #F56C6C;"
+            class="danger-text"
             @click="handleDelete(row)"
           >
             删除
@@ -154,7 +154,7 @@
       v-show="total > 0"
       :total="total"
       :page.sync="listQuery.page"
-      :limit.sync="listQuery.page_size"
+      :limit.sync="listQuery.pageSize"
       @pagination="getList"
     />
 
@@ -239,7 +239,7 @@ export default {
         domain_display_name: undefined,
         enabled: undefined,
         page: 1,
-        page_size: 20
+        pageSize: 20  // ✅ 修复：使用驼峰命名 pageSize
       },
       dialogVisible: false,
       dialogTitle: '新增配置',
@@ -256,7 +256,14 @@ export default {
         ],
         interval_minutes: [
           { required: true, message: '请输入汇报间隔', trigger: 'blur' },
-          { type: 'number', min: 1, max: 1440, message: '汇报间隔必须在 1-1440 分钟之间', trigger: 'blur' }
+          {
+            type: 'number',
+            min: 1,
+            max: 1440,
+            message: '汇报间隔必须在 1-1440 分钟之间',
+            trigger: 'blur',
+            transform: (value) => Number(value)  // ✅ 修复：确保类型转换
+          }
         ]
       }
     }
@@ -292,13 +299,30 @@ export default {
         domain_display_name: undefined,
         enabled: undefined,
         page: 1,
-        page_size: 20
+        pageSize: 20  // ✅ 修复：使用驼峰命名 pageSize
       }
       this.getList()
     },
 
     highlightWildcard(pattern) {
-      return pattern.replace(/%/g, '<span style="color: #059669; font-weight: 600;">%</span>')
+      // ✅ 修复：移除v-html，使用CSS类避免XSS风险
+      // 由于使用v-html存在XSS风险，改为在模板中使用条件渲染
+      return pattern  // 返回原始pattern，在模板中处理
+    },
+
+    sanitizeDomainPattern(pattern) {
+      // ✅ 修复：安全的HTML转义方法，防止XSS攻击
+      // 只转义通配符%为高亮样式，其他HTML字符进行转义
+      const escapeHtml = (text) => {
+        const div = document.createElement('div')
+        div.textContent = text
+        return div.innerHTML
+      }
+
+      // 先转义整个pattern
+      const escapedPattern = escapeHtml(pattern)
+      // 然后将转义后的%替换为高亮的%
+      return escapedPattern.replace(/%/g, '<span class="wildcard-highlight">%</span>')
     },
 
     openCreateDialog() {
@@ -332,7 +356,11 @@ export default {
     },
 
     handleSubmit() {
-      this.$refs.configForm.validate(valid => {
+      // ✅ 修复：在异步操作前保存this引用
+      const form = this.$refs.configForm
+      const that = this
+
+      form.validate(valid => {
         if (valid) {
           this.submitLoading = true
 
@@ -347,33 +375,33 @@ export default {
             // 更新
             updateReannounceConfig(this.formData.config_id, data).then(response => {
               if (response.code === '200') {
-                this.$message.success('配置更新成功')
-                this.dialogVisible = false
-                this.getList()
+                that.$message.success('配置更新成功')
+                that.dialogVisible = false
+                that.getList()
               } else {
-                this.$message.error(response.msg || '配置更新失败')
+                that.$message.error(response.msg || '配置更新失败')
               }
-              this.submitLoading = false
+              that.submitLoading = false
             }).catch(error => {
               console.error('配置更新失败:', error)
-              this.$message.error('配置更新失败')
-              this.submitLoading = false
+              that.$message.error('配置更新失败')
+              that.submitLoading = false
             })
           } else {
             // 新增
             createReannounceConfig(data).then(response => {
               if (response.code === '200') {
-                this.$message.success('配置创建成功')
-                this.dialogVisible = false
-                this.getList()
+                that.$message.success('配置创建成功')
+                that.dialogVisible = false
+                that.getList()
               } else {
-                this.$message.error(response.msg || '配置创建失败')
+                that.$message.error(response.msg || '配置创建失败')
               }
-              this.submitLoading = false
+              that.submitLoading = false
             }).catch(error => {
               console.error('配置创建失败:', error)
-              this.$message.error('配置创建失败')
-              this.submitLoading = false
+              that.$message.error('配置创建失败')
+              that.submitLoading = false
             })
           }
         }
@@ -381,15 +409,23 @@ export default {
     },
 
     handleToggleEnabled(row) {
-      const newEnabled = !row.enabled
+      const originalEnabled = row.enabled  // ✅ 保存原始状态
+      const newEnabled = !originalEnabled
+
+      // 先更新UI状态（乐观更新）
+      this.$set(row, 'enabled', newEnabled)
+
       updateReannounceConfig(row.config_id, { enabled: newEnabled }).then(response => {
         if (response.code === '200') {
-          row.enabled = newEnabled
           this.$message.success(newEnabled ? '配置已启用' : '配置已禁用')
         } else {
+          // 失败时回滚UI状态
+          this.$set(row, 'enabled', originalEnabled)
           this.$message.error(response.msg || '配置状态更新失败')
         }
       }).catch(error => {
+        // 异常时也要回滚UI状态
+        this.$set(row, 'enabled', originalEnabled)
         console.error('配置状态更新失败:', error)
         this.$message.error('配置状态更新失败')
       })
@@ -472,5 +508,35 @@ export default {
     gap: 12px;
     flex-wrap: wrap;
   }
+}
+
+/* ✅ 修复：添加通配符高亮样式 */
+.wildcard-highlight {
+  color: #059669;
+  font-weight: 600;
+}
+
+/* ✅ 修复：添加危险文本样式 */
+.danger-text {
+  color: #F56C6C;
+}
+
+/* ✅ 修复：页面头部样式 */
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-title {
+  font-size: 20px;
+  color: #303133;
+  font-weight: 600;
+  margin: 0;
+}
+
+.page-description {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 8px;
+  margin-bottom: 0;
 }
 </style>

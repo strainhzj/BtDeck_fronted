@@ -28,7 +28,7 @@ export interface TrackerKeywordListParams {
   enabled?: boolean
   keyword?: string
   page?: number
-  page_size?: number
+  pageSize?: number  // ✅ 修复：使用驼峰命名 pageSize
 }
 
 /**
@@ -87,7 +87,7 @@ export interface TrackerMessageLogListParams {
   first_seen_min?: string
   first_seen_max?: string
   page?: number
-  page_size?: number
+  pageSize?: number  // ✅ 修复：使用驼峰命名 pageSize
 }
 
 /**
@@ -470,7 +470,7 @@ export interface ReannounceConfigListParams {
   domain_display_name?: string
   enabled?: boolean
   page?: number
-  page_size?: number
+  pageSize?: number  // ✅ 修复：使用驼峰命名 pageSize
 }
 
 /**
