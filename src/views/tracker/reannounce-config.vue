@@ -58,23 +58,43 @@
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-button
-          type="primary"
-          icon="el-icon-plus"
-          @click="openCreateDialog"
-        >
-          新增配置
-        </el-button>
-        <el-button
-          icon="el-icon-search"
-          :loading="autoDetectLoading"
-          @click="handleAutoDetect"
-        >
-          自动检测域名
-        </el-button>
+        <template v-if="!batchMode">
+          <el-button
+            type="primary"
+            icon="el-icon-plus"
+            @click="openCreateDialog"
+          >
+            新增配置
+          </el-button>
+          <el-button
+            icon="el-icon-search"
+            :loading="autoDetectLoading"
+            @click="handleAutoDetect"
+          >
+            自动检测域名
+          </el-button>
+          <el-button
+            icon="el-icon-edit-outline"
+            @click="enterBatchMode"
+          >
+            批量设置
+          </el-button>
+        </template>
+        <template v-else>
+          <el-tag type="info" effect="plain">
+            批量编辑模式 - 已选择 {{ editedCount }} 条记录
+          </el-tag>
+          <el-button
+            icon="el-icon-close"
+            @click="exitBatchMode"
+          >
+            退出批量编辑
+          </el-button>
+        </template>
       </div>
       <div class="toolbar-right">
         <el-button
+          v-if="!batchMode"
           icon="el-icon-refresh"
           circle
           size="small"
@@ -82,6 +102,27 @@
         />
       </div>
     </div>
+
+    <!-- 批量编辑浮窗按钮 -->
+    <transition name="el-zoom-in-bottom">
+      <div v-if="batchMode && hasChanges" class="float-action-bar">
+        <div class="float-info">
+          <i class="el-icon-warning" />
+          <span>已修改 {{ editedCount }} 条记录</span>
+        </div>
+        <div class="float-buttons">
+          <el-button size="medium" @click="handleCancelChanges">撤销更改</el-button>
+          <el-button
+            type="primary"
+            size="medium"
+            :loading="savingBatch"
+            @click="handleSaveBatch"
+          >
+            保存更改
+          </el-button>
+        </div>
+      </div>
+    </transition>
 
     <!-- 表格 -->
     <el-table
@@ -91,32 +132,61 @@
       border
       fit
       highlight-current-row
+      row-key="config_id"
       :cell-style="cellStyle"
       :header-cell-style="headerCellStyle"
       header-row-class-name="reannounce-table-header"
       style="width: 100%;"
     >
-      <el-table-column label="域名显示名称" min-width="150" show-overflow-tooltip>
+      <el-table-column label="域名显示名称" min-width="150">
         <template slot-scope="{row}">
-          <span>{{ row.domain_display_name }}</span>
+          <el-input
+            v-if="batchMode && editedRows[row.config_id]"
+            v-model="editedRows[row.config_id].domain_display_name"
+            size="mini"
+            placeholder="域名显示名称"
+          />
+          <span v-else>{{ row.domain_display_name }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="域名模式" min-width="180" show-overflow-tooltip>
+      <el-table-column label="域名模式" min-width="180">
         <template slot-scope="{row}">
-          <span v-html="sanitizeDomainPattern(row.domain_pattern)" />
+          <el-input
+            v-if="batchMode && editedRows[row.config_id]"
+            v-model="editedRows[row.config_id].domain_pattern"
+            size="mini"
+            placeholder="%.tracker.com"
+          />
+          <span v-else v-html="sanitizeDomainPattern(row.domain_pattern)" />
         </template>
       </el-table-column>
 
       <el-table-column label="间隔分钟" width="100" align="center">
         <template slot-scope="{row}">
-          <span>{{ row.interval_minutes }}</span>
+          <el-input
+            v-if="batchMode && editedRows[row.config_id]"
+            v-model.number="editedRows[row.config_id].interval_minutes"
+            size="mini"
+            type="number"
+            :min="1"
+            :max="1440"
+            placeholder="分钟"
+            style="width: 70px;"
+          />
+          <span v-else>{{ row.interval_minutes }}</span>
         </template>
       </el-table-column>
 
       <el-table-column label="启用开关" width="100" align="center">
         <template slot-scope="{row}">
           <el-switch
+            v-if="batchMode && editedRows[row.config_id]"
+            :value="editedRows[row.config_id].enabled"
+            @change="handleFieldChange(row.config_id, 'enabled', $event)"
+          />
+          <el-switch
+            v-else
             :value="row.enabled"
             @change="handleToggleEnabled(row)"
           />
@@ -125,23 +195,29 @@
 
       <el-table-column label="操作" width="150" align="center" fixed="right">
         <template slot-scope="{row}">
-          <el-button
-            type="text"
-            size="small"
-            icon="el-icon-edit"
-            @click="openEditDialog(row)"
-          >
-            编辑
-          </el-button>
-          <el-button
-            type="text"
-            size="small"
-            icon="el-icon-delete"
-            class="danger-text"
-            @click="handleDelete(row)"
-          >
-            删除
-          </el-button>
+          <template v-if="batchMode">
+            <el-tag v-if="editedRows[row.config_id]" type="success" size="mini">已编辑</el-tag>
+            <span v-else class="no-edit-hint">未编辑</span>
+          </template>
+          <template v-else>
+            <el-button
+              type="text"
+              size="small"
+              icon="el-icon-edit"
+              @click="openEditDialog(row)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              type="text"
+              size="small"
+              icon="el-icon-delete"
+              class="danger-text"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -217,7 +293,7 @@
 </template>
 
 <script>
-import { getReannounceConfigs, createReannounceConfig, updateReannounceConfig, deleteReannounceConfig, autoDetectDomains } from '@/api/tracker'
+import { getReannounceConfigs, createReannounceConfig, updateReannounceConfig, deleteReannounceConfig, autoDetectDomains, batchUpdateReannounceConfigs } from '@/api/tracker'
 import Pagination from '@/components/Pagination'
 
 export default {
@@ -238,6 +314,11 @@ export default {
         page: 1,
         pageSize: 20  // ✅ 修复：使用驼峰命名 pageSize
       },
+      // 批量编辑相关状态
+      batchMode: false,
+      editedRows: {},     // { config_id: { field: value } }
+      originalData: {},  // { config_id: { 原始数据 } }
+      savingBatch: false,
       dialogVisible: false,
       dialogTitle: '新增配置',
       formData: {
@@ -267,6 +348,43 @@ export default {
   },
   created() {
     this.getList()
+  },
+  computed: {
+    // 是否有未保存的更改（比较editedRows和originalData）
+    hasChanges() {
+      for (const [configId, editedData] of Object.entries(this.editedRows)) {
+        const originalData = this.originalData[configId]
+        if (originalData) {
+          if (
+            editedData.domain_display_name !== originalData.domain_display_name ||
+            editedData.domain_pattern !== originalData.domain_pattern ||
+            editedData.interval_minutes !== originalData.interval_minutes ||
+            editedData.enabled !== originalData.enabled
+          ) {
+            return true
+          }
+        }
+      }
+      return false
+    },
+    // 获取真正编辑过的记录数
+    editedCount() {
+      let count = 0
+      for (const [configId, editedData] of Object.entries(this.editedRows)) {
+        const originalData = this.originalData[configId]
+        if (originalData) {
+          if (
+            editedData.domain_display_name !== originalData.domain_display_name ||
+            editedData.domain_pattern !== originalData.domain_pattern ||
+            editedData.interval_minutes !== originalData.interval_minutes ||
+            editedData.enabled !== originalData.enabled
+          ) {
+            count++
+          }
+        }
+      }
+      return count
+    }
   },
   methods: {
     cellStyle({ columnIndex }) {
@@ -480,6 +598,133 @@ export default {
         this.$message.error('自动检测失败')
         this.autoDetectLoading = false
       })
+    },
+
+    // ==================== 批量编辑相关方法 ====================
+
+    // 进入批量编辑模式
+    enterBatchMode() {
+      const that = this
+      // 保存原始数据快照 - 使用 $set 确保响应式
+      this.originalData = {}
+      this.list.forEach(row => {
+        that.$set(that.originalData, row.config_id, {
+          domain_display_name: row.domain_display_name,
+          domain_pattern: row.domain_pattern,
+          interval_minutes: row.interval_minutes,
+          enabled: row.enabled
+        })
+      })
+      // 初始化编辑数据 - 使用 $set 确保响应式
+      this.editedRows = {}
+      this.list.forEach(row => {
+        that.$set(that.editedRows, row.config_id, {
+          domain_display_name: row.domain_display_name,
+          domain_pattern: row.domain_pattern,
+          interval_minutes: row.interval_minutes,
+          enabled: row.enabled
+        })
+      })
+      this.batchMode = true
+    },
+
+    // 退出批量编辑模式
+    exitBatchMode() {
+      this.$confirm('退出批量编辑将丢失未保存的更改，确定要退出吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.batchMode = false
+        this.editedRows = {}
+        this.originalData = {}
+      }).catch(() => {})
+    },
+
+    // 处理字段变化
+    handleFieldChange(configId, field, value) {
+      if (!this.editedRows[configId]) {
+        this.$set(this.editedRows, configId, {})
+      }
+      this.$set(this.editedRows[configId], field, value)
+    },
+
+    // 撤销更改
+    handleCancelChanges() {
+      this.$confirm('确定要撤销所有更改吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        // 恢复到原始数据
+        this.list.forEach(row => {
+          if (this.originalData[row.config_id]) {
+            this.$set(this.editedRows, row.config_id, { ...this.originalData[row.config_id] })
+          }
+        })
+      }).catch(() => {})
+    },
+
+    // 保存批量更改
+    handleSaveBatch() {
+      // 构建批量更新数据
+      const items = []
+      for (const [configId, editedData] of Object.entries(this.editedRows)) {
+        const originalData = this.originalData[configId]
+        if (!originalData) continue
+
+        // 检查是否有变化
+        const hasChanges =
+          editedData.domain_display_name !== originalData.domain_display_name ||
+          editedData.domain_pattern !== originalData.domain_pattern ||
+          editedData.interval_minutes !== originalData.interval_minutes ||
+          editedData.enabled !== originalData.enabled
+
+        if (hasChanges) {
+          items.push({
+            config_id: configId,
+            domain_pattern: editedData.domain_pattern,
+            domain_display_name: editedData.domain_display_name,
+            interval_minutes: editedData.interval_minutes,
+            enabled: editedData.enabled
+          })
+        }
+      }
+
+      if (items.length === 0) {
+        this.$message.warning('没有需要保存的更改')
+        return
+      }
+
+      this.savingBatch = true
+      batchUpdateReannounceConfigs(items).then(response => {
+        console.log('批量更新响应:', response)
+        if (response.code === '200') {
+          const { success_count, failed_count, results } = response.data
+          if (failed_count > 0) {
+            // 部分失败
+            const failedItems = results.filter(r => !r.success)
+            const messages = failedItems.map(r => `${r.config_id}: ${r.message}`).join('; ')
+            this.$message.warning(`批量更新完成，成功 ${success_count} 条，失败 ${failed_count} 条：${messages}`)
+          } else {
+            this.$message.success(`批量更新成功，已保存 ${success_count} 条记录`)
+          }
+          // 刷新列表
+          this.getList()
+          // 清除编辑状态
+          this.editedRows = {}
+          this.originalData = {}
+          this.batchMode = false
+        } else {
+          this.$message.error(response.msg || '批量更新失败')
+        }
+        this.savingBatch = false
+      }).catch(error => {
+        console.error('批量更新失败:', error)
+        const errorMsg = error.response?.data?.msg || error.message || '批量更新失败'
+        this.$message.error(errorMsg)
+        this.savingBatch = false
+      })
     }
   }
 }
@@ -563,6 +808,41 @@ export default {
     font-weight: var(--font-weight-semibold);
     color: white;
     border-bottom: none;
+  }
+}
+
+/* 批量编辑模式样式 */
+.no-edit-hint {
+  color: #C0C4CC;
+  font-size: 12px;
+}
+
+/* 浮窗操作栏 */
+.float-action-bar {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 1000;
+
+  .float-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #E6A23C;
+    font-size: 14px;
+  }
+
+  .float-buttons {
+    display: flex;
+    gap: 12px;
   }
 }
 </style>

@@ -554,3 +554,45 @@ export function autoDetectDomains(): Promise<ApiResponse<AutoDetectDomainsRespon
     method: 'post'
   }) as unknown as Promise<ApiResponse<AutoDetectDomainsResponse>>
 }
+
+// ==================== 批量更新类型 ====================
+
+/**
+ * 批量更新汇报配置项
+ */
+export interface BatchUpdateReannounceConfigItem {
+  config_id: string
+  domain_pattern?: string
+  domain_display_name?: string
+  interval_minutes?: number
+  enabled?: boolean
+}
+
+/**
+ * 批量更新结果项
+ */
+export interface BatchUpdateResultItem {
+  config_id: string
+  success: boolean
+  message?: string
+}
+
+/**
+ * 批量更新响应
+ */
+export interface BatchUpdateResponse {
+  success_count: number
+  failed_count: number
+  results: BatchUpdateResultItem[]
+}
+
+/**
+ * 批量更新汇报配置
+ */
+export function batchUpdateReannounceConfigs(data: BatchUpdateReannounceConfigItem[]): Promise<ApiResponse<BatchUpdateResponse>> {
+  return request({
+    url: '/tracker-reannounce/configs/batch',
+    method: 'put',
+    data: { items: data }
+  }) as unknown as Promise<ApiResponse<BatchUpdateResponse>>
+}
