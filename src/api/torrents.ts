@@ -1085,6 +1085,7 @@ export function setTorrentLocation(data: SetLocationRequest): Promise<ApiRespons
  */
 export interface ReannounceRequest {
   hashes?: string[]  // 种子hash列表
+  info_ids?: string[]  // 种子info_id列表
   downloader_id?: string | number  // 下载器ID
 }
 

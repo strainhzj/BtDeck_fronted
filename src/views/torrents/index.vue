@@ -127,6 +127,15 @@
         @click="handleBatchTracker"
       />
 
+      <!-- Tracker汇报 -->
+      <batch-button
+        type="info"
+        icon="el-icon-share"
+        tooltip="Tracker汇报"
+        :disabled="multipleSelection.length === 0"
+        @click="handleBatchReannounce"
+      />
+
       <!-- 全局替换 -->
       <batch-button
         type="default"
@@ -1051,6 +1060,42 @@ export default class extends Vue {
     } catch (error) {
       console.error('批量重检失败:', error)
       this.$message.error('批量重检失败，请查看控制台')
+    }
+  }
+
+  private async handleBatchReannounce() {
+    if (this.multipleSelection.length === 0) return
+    try {
+      // 按下载器ID分组
+      const groups = this.groupTorrentsByDownloader(this.multipleSelection)
+
+      // 并行调用所有下载器的Tracker汇报操作
+      const promises = Object.entries(groups).map(([downloaderId, torrents]) => {
+        const info_ids = torrents.map(t => t.info_id)
+        return reannounceTorrents({ downloader_id: downloaderId, info_ids })
+      })
+
+      // 使用Promise.allSettled获取更精细的错误反馈
+      const results = await Promise.allSettled(promises)
+
+      // 统计成功和失败的数量
+      const succeeded = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+
+      // 汇总结果
+      const total = this.multipleSelection.length
+      const downloaderCount = Object.keys(groups).length
+
+      if (failed > 0) {
+        this.$message.warning(`Tracker汇报部分完成：成功${succeeded}个下载器，失败${failed}个下载器（共${total}个种子）`)
+      } else {
+        this.$message.success(`Tracker汇报成功(${total}个种子, ${downloaderCount}个下载器)`)
+      }
+
+      this.getList()
+    } catch (error) {
+      console.error('Tracker汇报失败:', error)
+      this.$message.error('Tracker汇报失败，请查看控制台')
     }
   }
 
