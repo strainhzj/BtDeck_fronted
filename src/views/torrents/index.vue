@@ -350,7 +350,7 @@
               <th>Announce信息</th>
               <th style="width: 100px;">Scrape状态</th>
               <th>Scrape信息</th>
-              <th style="width: 80px;">操作</th>
+              <th style="width: 80px;" class="tracker-sticky-col">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -386,7 +386,7 @@
                 </span>
               </td>
               <td>{{ tracker.last_scrape_msg || tracker.lastScrapeMsg || '-' }}</td>
-              <td>
+              <td class="tracker-sticky-col">
                 <el-button
                   type="text"
                   size="small"
@@ -930,18 +930,21 @@ export default class extends Vue {
       return  // ✅ 修复：添加hash检查
     }
 
+    const downloaderId = this.currentRow.downloader_id || this.currentRow.downloaderId
+
     // 设置loading状态
     this.$set(tracker, 'reannouncing', true)
 
     try {
       const response = await reannounceTorrents({
-        hashes: [this.currentRow.hash]
+        hashes: [this.currentRow.hash],
+        downloader_id: downloaderId
       })
 
       if (response.code === '200') {
         this.$message.success(`Tracker汇报成功`)
         // 刷新种子列表
-        await this.getTorrentListData()
+        await this.getList()
       } else {
         this.$message.error(response.msg || 'Tracker汇报失败')
       }

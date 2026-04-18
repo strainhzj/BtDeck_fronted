@@ -706,6 +706,22 @@
       color: var(--color-text-tertiary);
       font-weight: var(--font-weight-normal);
     }
+
+    /* 操作列冻结在右侧 */
+    .tracker-sticky-col {
+      position: sticky;
+      right: 0;
+      background: var(--color-bg-primary, #fff);
+      z-index: 2;
+    }
+
+    th.tracker-sticky-col {
+      background: var(--color-bg-secondary);
+    }
+
+    tbody tr:hover .tracker-sticky-col {
+      background: var(--color-bg-hover);
+    }
   }
 }
 
