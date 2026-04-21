@@ -65,7 +65,7 @@ class User extends VuexModule implements IUserState {
     this.twoFactorFlag = flag
   }
 
-  @Action
+  @Action({ rawError: true })
   public async Login(userInfo: ILoginPayload) {
     let { username, password, twofa_code } = userInfo
     username = username.trim()
@@ -87,7 +87,7 @@ class User extends VuexModule implements IUserState {
     }
   }
 
-  @Action
+  @Action({ rawError: true })
   public ResetToken() {
     removeToken()
     this.SET_TOKEN('')
@@ -95,7 +95,7 @@ class User extends VuexModule implements IUserState {
     this.SET_ROLES([])
   }
 
-  @Action
+  @Action({ rawError: true })
   public async GetUserInfo() {
     // 🔧 防御性检查：更详细的 token 验证
     if (!this.token || this.token.trim() === '') {
@@ -162,7 +162,7 @@ class User extends VuexModule implements IUserState {
     }
   }
 
-  @Action
+  @Action({ rawError: true })
   public async LogOut() {
     if (this.token === '') {
       throw Error('LogOut: token is undefined!')

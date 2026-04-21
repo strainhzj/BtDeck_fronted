@@ -127,6 +127,15 @@
         @click="handleBatchTracker"
       />
 
+      <!-- Tracker汇报 -->
+      <batch-button
+        type="info"
+        icon="el-icon-share"
+        tooltip="Tracker汇报"
+        :disabled="multipleSelection.length === 0"
+        @click="handleBatchReannounce"
+      />
+
       <!-- 全局替换 -->
       <batch-button
         type="default"
@@ -341,6 +350,7 @@
               <th>Announce信息</th>
               <th style="width: 100px;">Scrape状态</th>
               <th>Scrape信息</th>
+              <th style="width: 80px;" class="tracker-sticky-col">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -376,6 +386,16 @@
                 </span>
               </td>
               <td>{{ tracker.last_scrape_msg || tracker.lastScrapeMsg || '-' }}</td>
+              <td class="tracker-sticky-col">
+                <el-button
+                  type="text"
+                  size="small"
+                  :loading="tracker.reannouncing"
+                  @click="handleTrackerReannounce(tracker, index)"
+                >
+                  汇报
+                </el-button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -548,7 +568,8 @@ import {
   advancedSearch,
   getDuplicateTorrents,
   getDownloaderList,
-  DownloaderSimple
+  DownloaderSimple,
+  reannounceTorrents
 } from '@/api/torrents'
 import { TorrentStatus } from '@/types/torrent'
 import { STATUS_OPTIONS, getStatusIcon, getStatusText } from '@/constants/status-config'
@@ -900,6 +921,42 @@ export default class extends Vue {
     return 'tracker-status-neutral'
   }
 
+  /**
+   * 处理单个Tracker的汇报操作
+   */
+  private async handleTrackerReannounce(tracker: any, index: number) {
+    if (!this.currentRow?.hash) {
+      this.$message.error('种子信息不完整，无法汇报')
+      return  // ✅ 修复：添加hash检查
+    }
+
+    const downloaderId = this.currentRow.downloader_id || this.currentRow.downloaderId
+
+    // 设置loading状态
+    this.$set(tracker, 'reannouncing', true)
+
+    try {
+      const response = await reannounceTorrents({
+        hashes: [this.currentRow.hash],
+        downloader_id: downloaderId
+      })
+
+      if (response.code === '200') {
+        this.$message.success(`Tracker汇报成功`)
+        // 刷新种子列表
+        await this.getList()
+      } else {
+        this.$message.error(response.msg || 'Tracker汇报失败')
+      }
+    } catch (error) {
+      console.error('Tracker汇报失败:', error)
+      this.$message.error('Tracker汇报失败')
+    } finally {
+      // 清除loading状态
+      this.$set(tracker, 'reannouncing', false)
+    }
+  }
+
   // 批量操作
   private async handleBatchStart() {
     if (this.multipleSelection.length === 0) return
@@ -1006,6 +1063,42 @@ export default class extends Vue {
     } catch (error) {
       console.error('批量重检失败:', error)
       this.$message.error('批量重检失败，请查看控制台')
+    }
+  }
+
+  private async handleBatchReannounce() {
+    if (this.multipleSelection.length === 0) return
+    try {
+      // 按下载器ID分组
+      const groups = this.groupTorrentsByDownloader(this.multipleSelection)
+
+      // 并行调用所有下载器的Tracker汇报操作
+      const promises = Object.entries(groups).map(([downloaderId, torrents]) => {
+        const info_ids = torrents.map(t => t.info_id)
+        return reannounceTorrents({ downloader_id: downloaderId, info_ids })
+      })
+
+      // 使用Promise.allSettled获取更精细的错误反馈
+      const results = await Promise.allSettled(promises)
+
+      // 统计成功和失败的数量
+      const succeeded = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+
+      // 汇总结果
+      const total = this.multipleSelection.length
+      const downloaderCount = Object.keys(groups).length
+
+      if (failed > 0) {
+        this.$message.warning(`Tracker汇报部分完成：成功${succeeded}个下载器，失败${failed}个下载器（共${total}个种子）`)
+      } else {
+        this.$message.success(`Tracker汇报成功(${total}个种子, ${downloaderCount}个下载器)`)
+      }
+
+      this.getList()
+    } catch (error) {
+      console.error('Tracker汇报失败:', error)
+      this.$message.error('Tracker汇报失败，请查看控制台')
     }
   }
 

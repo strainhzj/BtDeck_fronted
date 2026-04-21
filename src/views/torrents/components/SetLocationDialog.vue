@@ -36,7 +36,7 @@
             style="width: 100%"
             @select="handlePathSelect"
           >
-            <template slot-scope="{ item }">
+            <template slot-scope="{item}">
               <div class="path-suggestion">
                 <span class="path-value">{{ item.value }}</span>
                 <span v-if="item.path_type === 'default'" class="path-type">默认路径</span>

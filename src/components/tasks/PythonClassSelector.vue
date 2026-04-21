@@ -298,6 +298,7 @@
 
 <script lang="ts">
 import { Component, Vue, Prop, Watch } from 'vue-property-decorator'
+import { validatePythonClass } from '@/api/tasks'
 
 interface ClassNode {
   label: string
@@ -822,10 +823,8 @@ export default class PythonClassSelector extends Vue {
 
   private async callClassCheckAPI(path: string): Promise<ValidationResult> {
     try {
-      const response = await this.$http.post('/api/v1/validation/python-class', {
-        class_path: path
-      })
-      return response.data.data
+      const response = await validatePythonClass({ class_path: path })
+      return response.data
     } catch (error) {
       console.error('调用类检查API失败:', error)
       // 本地基础验证作为后备

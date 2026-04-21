@@ -1,7 +1,6 @@
 import router from './router'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-import Message from 'element-ui/packages/message'
 import { Route } from 'vue-router'
 import { UserModule } from '@/store/modules/user'
 
@@ -39,9 +38,8 @@ router.beforeEach(async(to: Route, from: Route, next: any) => {
           // 此时不会触发额外的导航，因为这是在同一个导航周期内完成
           next()
         } catch (err) {
-          // Remove token and redirect to login page
+          // Token无效或过期，清除状态并重定向到登录页
           UserModule.ResetToken()
-          Message.error(err + '' || 'Has Error')
           next(`/login?redirect=${encodeURIComponent(to.path)}`)
           NProgress.done()
         }

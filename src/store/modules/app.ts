@@ -47,17 +47,17 @@ class App extends VuexModule implements IAppState {
     this.device = device
   }
 
-  @Action
+  @Action({ rawError: true })
   public ToggleSideBar(withoutAnimation: boolean) {
     this.TOGGLE_SIDEBAR(withoutAnimation)
   }
 
-  @Action
+  @Action({ rawError: true })
   public CloseSideBar(withoutAnimation: boolean) {
     this.CLOSE_SIDEBAR(withoutAnimation)
   }
 
-  @Action
+  @Action({ rawError: true })
   public ToggleDevice(device: DeviceType) {
     this.TOGGLE_DEVICE(device)
   }

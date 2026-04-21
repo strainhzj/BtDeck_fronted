@@ -1,12 +1,14 @@
 import axios from 'axios'
 import Message from 'element-ui/packages/message'
-import MessageBox from 'element-ui/packages/message-box'
 import { UserModule } from '@/store/modules/user'
 
 const service = axios.create({
   baseURL: process.env.VUE_APP_BASE_API,
   timeout: 20000
 })
+
+/** 防止并发401重复弹窗/跳转 */
+let isRedirectingToLogin = false
 
 /**
  * 调试模式开关
@@ -90,30 +92,19 @@ service.interceptors.response.use(
 
     // 认证错误 - 判断是否为登录接口
     if (res.code === '401') {
-      // 显示错误消息
-      Message({
-        message: res.msg || '认证失败，请重新登录',
-        type: 'error',
-        duration: 5 * 1000
-      })
-
-      // 检查是否为登录接口的401错误（登录失败不应该自动登出和弹窗）
       const isLoginRequest = response.config.url?.includes('/login')
 
-      if (!isLoginRequest) {
-        // 非登录接口的401错误，提示用户重新登录
-        MessageBox.confirm(
-          res.msg || '登录状态已过期，请重新登录',
-          '登录过期',
-          {
-            confirmButtonText: '重新登录',
-            cancelButtonText: '取消',
-            type: 'warning'
-          }
-        ).then(() => {
-          UserModule.ResetToken()
-          location.reload()
-        })
+      // 登录接口401：仅返回错误，不触发跳转逻辑
+      if (isLoginRequest) {
+        return Promise.reject(new Error(res.msg || '认证失败'))
+      }
+
+      // 非登录接口401：防抖，只处理一次
+      if (!isRedirectingToLogin) {
+        isRedirectingToLogin = true
+        UserModule.ResetToken()
+        // 跳转到登录页，携带当前路径以便登录后返回
+        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
       }
 
       return Promise.reject(new Error(res.msg || '认证失败'))
@@ -132,18 +123,11 @@ service.interceptors.response.use(
       switch (error.response.status) {
         case 401:
           errorMessage = '认证失败，请重新登录'
-          MessageBox.confirm(
-            '登录状态已过期，请重新登录',
-            '登录过期',
-            {
-              confirmButtonText: '重新登录',
-              cancelButtonText: '取消',
-              type: 'warning'
-            }
-          ).then(() => {
+          if (!isRedirectingToLogin) {
+            isRedirectingToLogin = true
             UserModule.ResetToken()
-            location.reload()
-          })
+            window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`
+          }
           break
         default:
           // 🔧 修复：除 401 外的所有 HTTP 错误都不显示弹框，让业务代码统一处理

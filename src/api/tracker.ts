@@ -28,7 +28,7 @@ export interface TrackerKeywordListParams {
   enabled?: boolean
   keyword?: string
   page?: number
-  page_size?: number
+  pageSize?: number  // ✅ 修复：使用驼峰命名 pageSize
 }
 
 /**
@@ -87,7 +87,7 @@ export interface TrackerMessageLogListParams {
   first_seen_min?: string
   first_seen_max?: string
   page?: number
-  page_size?: number
+  pageSize?: number  // ✅ 修复：使用驼峰命名 pageSize
 }
 
 /**
@@ -445,4 +445,154 @@ export function searchAllPools(params?: SearchAllPoolsParams): Promise<ApiRespon
     method: 'get',
     params
   }) as unknown as Promise<ApiResponse<PaginatedResponse<SearchResultItem>>>
+}
+
+// ==================== Tracker汇报配置API ====================
+
+/**
+ * Tracker汇报配置
+ */
+export interface TrackerReannounceConfig {
+  config_id: string
+  domain_pattern: string
+  domain_display_name: string
+  interval_minutes: number
+  enabled: boolean
+  last_reannounce_time?: string
+  create_time?: string
+  update_time?: string
+}
+
+/**
+ * 汇报配置列表查询参数
+ */
+export interface ReannounceConfigListParams {
+  domain_display_name?: string
+  enabled?: boolean
+  page?: number
+  pageSize?: number  // ✅ 修复：使用驼峰命名 pageSize
+}
+
+/**
+ * 创建汇报配置请求
+ */
+export interface CreateReannounceConfigRequest {
+  domain_pattern: string
+  domain_display_name?: string
+  interval_minutes: number
+  enabled: boolean
+}
+
+/**
+ * 更新汇报配置请求
+ */
+export interface UpdateReannounceConfigRequest {
+  domain_pattern?: string
+  domain_display_name?: string
+  interval_minutes?: number
+  enabled?: boolean
+}
+
+/**
+ * 自动检测域名响应
+ */
+export interface AutoDetectDomainsResponse {
+  detected: number
+  created: number
+  configs: TrackerReannounceConfig[]
+}
+
+/**
+ * 获取汇报配置列表
+ */
+export function getReannounceConfigs(params?: ReannounceConfigListParams): Promise<ApiResponse<PaginatedResponse<TrackerReannounceConfig>>> {
+  return request({
+    url: '/tracker-reannounce/configs',
+    method: 'get',
+    params
+  }) as unknown as Promise<ApiResponse<PaginatedResponse<TrackerReannounceConfig>>>
+}
+
+/**
+ * 创建汇报配置
+ */
+export function createReannounceConfig(data: CreateReannounceConfigRequest): Promise<ApiResponse<TrackerReannounceConfig>> {
+  return request({
+    url: '/tracker-reannounce/configs',
+    method: 'post',
+    data
+  }) as unknown as Promise<ApiResponse<TrackerReannounceConfig>>
+}
+
+/**
+ * 更新汇报配置
+ */
+export function updateReannounceConfig(configId: string, data: UpdateReannounceConfigRequest): Promise<ApiResponse<TrackerReannounceConfig>> {
+  return request({
+    url: `/tracker-reannounce/configs/${configId}`,
+    method: 'put',
+    data
+  }) as unknown as Promise<ApiResponse<TrackerReannounceConfig>>
+}
+
+/**
+ * 删除汇报配置
+ */
+export function deleteReannounceConfig(configId: string): Promise<ApiResponse<any>> {
+  return request({
+    url: `/tracker-reannounce/configs/${configId}`,
+    method: 'delete'
+  }) as unknown as Promise<ApiResponse<any>>
+}
+
+/**
+ * 自动检测域名
+ */
+export function autoDetectDomains(): Promise<ApiResponse<AutoDetectDomainsResponse>> {
+  return request({
+    url: '/tracker-reannounce/configs/auto-detect',
+    method: 'post'
+  }) as unknown as Promise<ApiResponse<AutoDetectDomainsResponse>>
+}
+
+// ==================== 批量更新类型 ====================
+
+/**
+ * 批量更新汇报配置项
+ */
+export interface BatchUpdateReannounceConfigItem {
+  config_id: string
+  domain_pattern?: string
+  domain_display_name?: string
+  interval_minutes?: number
+  enabled?: boolean
+}
+
+/**
+ * 批量更新结果项
+ */
+export interface BatchUpdateResultItem {
+  config_id: string
+  success: boolean
+  message?: string
+}
+
+/**
+ * 批量更新响应
+ */
+export interface BatchUpdateResponse {
+  success_count: number
+  failed_count: number
+  results: BatchUpdateResultItem[]
+}
+
+/**
+ * 批量更新汇报配置
+ */
+export function batchUpdateReannounceConfigs(data: BatchUpdateReannounceConfigItem[]): Promise<ApiResponse<BatchUpdateResponse>> {
+  return request({
+    url: '/tracker-reannounce/configs/batch',
+    method: 'put',
+    data: { items: data }
+  }) as unknown as Promise<ApiResponse<BatchUpdateResponse>>
 }
