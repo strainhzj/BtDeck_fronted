@@ -56,6 +56,9 @@
         <el-button class="clear-btn" @click="handleClearFilter">
           清空
         </el-button>
+        <el-button class="refresh-btn" @click="handleManualRefresh" :loading="listLoading">
+          刷新
+        </el-button>
       </div>
     </section>
 
@@ -213,7 +216,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="(torrent, index) in list"
+            v-for="(torrent, index) in sortedList"
             :key="`${torrent.hash}-${torrent.downloaderId || torrent.downloader_id}-${index}`"
             :class="{selected: currentRow?.hash === torrent.hash}"
             @click="handleRowClick(torrent)"
@@ -841,6 +844,12 @@ export default class extends Vue {
       sort_order: 'desc'
     }
     this.getList()
+  }
+
+  // 手动刷新（静态数据 + 速度数据同时刷新）
+  private handleManualRefresh() {
+    this.getList()
+    this.loadActiveSpeed()
   }
 
   // 分页切换
@@ -1954,6 +1963,31 @@ export default class extends Vue {
 
   // ==================== 实时速度轮询 ====================
 
+  /** 用户是否正在使用筛选条件（搜索/筛选时禁用速度排序） */
+  private get isUserFiltering(): boolean {
+    const q = this.listQuery
+    return !!(
+      (q.name_like && q.name_like.trim() !== '') ||
+      (q.downloader_id && q.downloader_id.length > 0) ||
+      (q.status && q.status.length > 0)
+    )
+  }
+
+  /** 排序后的列表（活跃种子优先，用户筛选时保持服务端排序） */
+  private get sortedList(): any[] {
+    if (!this.list || this.list.length === 0) return []
+    if (this.isUserFiltering) return this.list
+    return [...this.list].sort((a, b) => {
+      const aSpeed = this.getTorrentSpeed(a, 'download') || this.getTorrentSpeed(a, 'upload') || 0
+      const bSpeed = this.getTorrentSpeed(b, 'download') || this.getTorrentSpeed(b, 'upload') || 0
+      const aActive = aSpeed > 0 ? 1 : 0
+      const bActive = bSpeed > 0 ? 1 : 0
+      if (aActive !== bActive) return bActive - aActive
+      if (aActive === 1) return bSpeed - aSpeed
+      return 0
+    })
+  }
+
   /** 获取种子的实时显示速度（优先使用轮询数据，降级使用静态数据） */
   private getTorrentSpeed(torrent: any, type: 'download' | 'upload'): number | null {
     const active = this.activeSpeedMap[torrent.hash]
@@ -2275,6 +2309,28 @@ export default class extends Vue {
 // 重复检测按钮样式（白色按钮）
 // ========================================
 .duplicate-detection-btn {
+  background: white !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border-primary) !important;
+  transition: all var(--transition-base) ease;
+
+  &:hover:not(:disabled) {
+    background: var(--color-bg-secondary) !important;
+    border-color: var(--color-border-secondary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// ========================================
+// 刷新按钮样式（白色按钮）
+// ========================================
+.refresh-btn {
   background: white !important;
   color: var(--color-text-primary) !important;
   border: 1px solid var(--color-border-primary) !important;
