@@ -249,8 +249,8 @@
                 </div>
                 <div class="progress-text">
                   {{ torrent.progress || 0 }}%
-                  <span v-if="torrent.downloadSpeed || torrent.uploadSpeed">
-                    • {{ formatSpeed(torrent.downloadSpeed || torrent.uploadSpeed) }}
+                  <span v-if="getTorrentSpeed(torrent, 'download') || getTorrentSpeed(torrent, 'upload')">
+                    • {{ formatSpeed(getTorrentSpeed(torrent, 'download') || getTorrentSpeed(torrent, 'upload')) }}
                   </span>
                 </div>
               </div>
@@ -569,7 +569,8 @@ import {
   getDuplicateTorrents,
   getDownloaderList,
   DownloaderSimple,
-  reannounceTorrents
+  reannounceTorrents,
+  getActiveTorrents
 } from '@/api/torrents'
 import { TorrentStatus } from '@/types/torrent'
 import { STATUS_OPTIONS, getStatusIcon, getStatusText } from '@/constants/status-config'
@@ -612,6 +613,11 @@ export default class extends Vue {
   private total = 0
   private listLoading = true
   private multipleSelection: any[] = []
+
+  // 实时速度轮询
+  private speedTimer: number | null = null
+  private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number }> = {}
+  private speedPollingPending = false
 
   // 分页相关
   private currentPage = 1
@@ -744,6 +750,11 @@ export default class extends Vue {
     await this.getDownloaderList()
     await this.getList()
     this.loadUserPreferences()
+    this.startSpeedPolling()
+  }
+
+  beforeDestroy() {
+    this.stopSpeedPolling()
   }
 
   // 主题切换
@@ -1939,6 +1950,54 @@ export default class extends Vue {
 
   private formatSpeed(speed: number | null | undefined): string {
     return formatSpeed(speed)
+  }
+
+  // ==================== 实时速度轮询 ====================
+
+  /** 获取种子的实时显示速度（优先使用轮询数据，降级使用静态数据） */
+  private getTorrentSpeed(torrent: any, type: 'download' | 'upload'): number | null {
+    const active = this.activeSpeedMap[torrent.hash]
+    if (active) {
+      return type === 'download' ? active.downloadSpeed : active.uploadSpeed
+    }
+    return type === 'download' ? (torrent.downloadSpeed ?? null) : (torrent.uploadSpeed ?? null)
+  }
+
+  /** 加载活跃种子实时速度 */
+  private async loadActiveSpeed() {
+    if (this.speedPollingPending) return
+    this.speedPollingPending = true
+    try {
+      const res = await getActiveTorrents()
+      if (res.code === '200' && res.data) {
+        const map: Record<string, { downloadSpeed: number, uploadSpeed: number }> = {}
+        ;(res.data as any[]).forEach((t: any) => {
+          map[t.hash] = { downloadSpeed: t.downloadSpeed ?? 0, uploadSpeed: t.uploadSpeed ?? 0 }
+        })
+        this.activeSpeedMap = map
+      }
+    } catch (e) {
+      // 静默失败，不影响主流程
+      console.debug('速度轮询失败:', e)
+    } finally {
+      this.speedPollingPending = false
+    }
+  }
+
+  /** 启动速度轮询（1秒间隔） */
+  private startSpeedPolling() {
+    this.loadActiveSpeed()
+    this.speedTimer = window.setInterval(() => {
+      this.loadActiveSpeed()
+    }, 1000)
+  }
+
+  /** 停止速度轮询 */
+  private stopSpeedPolling() {
+    if (this.speedTimer) {
+      clearInterval(this.speedTimer)
+      this.speedTimer = null
+    }
   }
 
   private formatDate(timestamp: number | string | null | undefined): string {
