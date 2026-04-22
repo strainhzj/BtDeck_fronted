@@ -365,6 +365,25 @@ npm run preview
 
 ---
 
+## 📁 必需文件
+
+| 文件 | 用途 | 更新频率 |
+|------|------|----------|
+| `AGENTS.md` | 前端工作流（本文件） | 稳定 |
+| `CLAUDE.md` | 前端技术约束 | 稳定 |
+| `docs/constraints/` | 约束详细规范（见下表） | 稳定 |
+
+### 约束文档清单（`docs/constraints/`）
+
+| 文件 | 约束内容 | 适用场景 |
+|------|----------|----------|
+| `api-response-format.md` | API 统一响应格式、分页字段名（`list`/`total`/`pageSize`） | 调用/解析任何 API 时 |
+| `code-reuse.md` | 代码复用优先原则、>50% 相似度扩展 | 创建新组件/函数前 |
+| `common-variables.md` | 公共 CSS 变量先行、禁止硬编码颜色值 | 编写样式时 |
+| `vue-async-context.md` | Vue 2 异步操作 `this` 上下文丢失问题 | 编写 async 方法时 |
+
+---
+
 ## 📚 参考资料
 
 ### 内部文档
