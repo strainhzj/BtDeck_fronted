@@ -621,6 +621,7 @@ export default class extends Vue {
   private speedTimer: number | null = null
   private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number }> = {}
   private speedPollingPending = false
+  private speedRequestCount = 0  // 请求计数器，用于检测潜在竞态
 
   // 分页相关
   private currentPage = 1
@@ -757,7 +758,11 @@ export default class extends Vue {
   }
 
   beforeDestroy() {
-    this.stopSpeedPolling()
+    try {
+      this.stopSpeedPolling()
+    } catch (e) {
+      console.error('[速度轮询] 清理定时器失败:', e)
+    }
   }
 
   // 主题切换
@@ -1999,21 +2004,45 @@ export default class extends Vue {
 
   /** 加载活跃种子实时速度 */
   private async loadActiveSpeed() {
-    if (this.speedPollingPending) return
+    // 防抖保护：已有请求在处理中
+    if (this.speedPollingPending) {
+      this.speedRequestCount++
+      // 记录潜在竞态（仅调试用）
+      if (this.speedRequestCount > 3) {
+        console.warn(`[速度轮询] 检测到高频调用，已忽略 ${this.speedRequestCount} 次请求`)
+      }
+      return
+    }
+
+    // 请求开始
     this.speedPollingPending = true
+    this.speedRequestCount = 0
+    const requestId = Date.now()
+
     try {
       const res = await getActiveTorrents()
       if (res.code === '200' && res.data) {
         const map: Record<string, { downloadSpeed: number, uploadSpeed: number }> = {}
-        ;(res.data as any[]).forEach((t: any) => {
-          map[t.hash] = { downloadSpeed: t.downloadSpeed ?? 0, uploadSpeed: t.uploadSpeed ?? 0 }
+        const torrents = res.data as ActiveTorrentSpeed[]
+        torrents.forEach((t: ActiveTorrentSpeed) => {
+          // 防御性检查：确保hash字段存在
+          if (!t.hash) {
+            console.warn('[速度轮询] 跳过无效种子数据:', t)
+            return
+          }
+          map[t.hash] = {
+            downloadSpeed: t.downloadSpeed ?? 0,
+            uploadSpeed: t.uploadSpeed ?? 0
+          }
         })
         this.activeSpeedMap = map
+        console.debug(`[速度轮询] 请求 ${requestId} 完成，更新 ${Object.keys(map).length} 个活跃种子`)
       }
     } catch (e) {
       // 静默失败，不影响主流程
-      console.debug('速度轮询失败:', e)
+      console.debug(`[速度轮询] 请求 ${requestId} 失败:`, e)
     } finally {
+      // 请求结束，允许下一次请求
       this.speedPollingPending = false
     }
   }
