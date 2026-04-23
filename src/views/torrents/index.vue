@@ -203,6 +203,8 @@
               />
             </th>
             <th v-if="getColumnSetting('name').visible">种子名称</th>
+            <th v-if="getColumnSetting('downloadSpeed').visible" style="width: 100px;">下载速度</th>
+            <th v-if="getColumnSetting('uploadSpeed').visible" style="width: 100px;">上传速度</th>
             <th v-if="getColumnSetting('size').visible" style="width: 100px;">大小</th>
             <th v-if="getColumnSetting('progress').visible" style="width: 140px;">进度</th>
             <th v-if="getColumnSetting('status').visible" style="width: 90px;">状态</th>
@@ -240,6 +242,12 @@
                   {{ torrent.name }}
                 </div>
               </div>
+            </td>
+            <td v-if="getColumnSetting('downloadSpeed').visible">
+              <span class="speed-value download">{{ formatSpeed(getTorrentSpeed(torrent, 'download')) }}</span>
+            </td>
+            <td v-if="getColumnSetting('uploadSpeed').visible">
+              <span class="speed-value upload">{{ formatSpeed(getTorrentSpeed(torrent, 'upload')) }}</span>
             </td>
             <td v-if="getColumnSetting('size').visible">{{ formatFileSize(torrent.size) }}</td>
             <td v-if="getColumnSetting('progress').visible">
@@ -699,6 +707,8 @@ export default class extends Vue {
   // 列设置
   private columnSettings = [
     { key: 'name', label: '种子名称', visible: true },
+    { key: 'downloadSpeed', label: '下载速度', visible: true },
+    { key: 'uploadSpeed', label: '上传速度', visible: true },
     { key: 'size', label: '大小', visible: true },
     { key: 'progress', label: '进度', visible: true },
     { key: 'status', label: '状态', visible: true },
@@ -1978,10 +1988,9 @@ export default class extends Vue {
     )
   }
 
-  /** 排序后的列表（活跃种子优先，用户筛选时保持服务端排序） */
+  /** 排序后的列表（活跃种子优先，始终生效） */
   private get sortedList(): any[] {
     if (!this.list || this.list.length === 0) return []
-    if (this.isUserFiltering) return this.list
     return [...this.list].sort((a, b) => {
       const aSpeed = this.getTorrentSpeed(a, 'download') || this.getTorrentSpeed(a, 'upload') || 0
       const bSpeed = this.getTorrentSpeed(b, 'download') || this.getTorrentSpeed(b, 'upload') || 0
@@ -2427,4 +2436,26 @@ export default class extends Vue {
     color: #F56C6C;
   }
 }
-</style>
+
+// ========================================
+// 速度列样式
+// ========================================
+.speed-value {
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: var(--color-text-secondary);
+
+  &.download::before {
+    content: '▼';
+    margin-right: 2px;
+    font-size: 10px;
+    opacity: 0.6;
+  }
+
+  &.upload::before {
+    content: '▲';
+    margin-right: 2px;
+    font-size: 10px;
+    opacity: 0.6;
+  }
+}
