@@ -14,14 +14,6 @@
 
     <!-- 右侧区域 -->
     <div class="navbar-right">
-      <!-- 全局搜索 -->
-      <el-button
-        class="icon-button"
-        icon="el-icon-search"
-        circle
-        @click="handleSearch"
-      />
-
       <!-- 通知中心 -->
       <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="notification-badge">
         <el-button
@@ -77,7 +69,7 @@ import ThemeSwitcher from '@/components/ThemeSwitcher/index.vue'
   }
 })
 export default class extends Vue {
-  private notificationCount = 3 // 示例通知数量
+  private notificationCount = 0 // 通知数量
 
   get avatar() {
     return UserModule.avatar
@@ -85,10 +77,6 @@ export default class extends Vue {
 
   get userName() {
     return UserModule.name || '管理员'
-  }
-
-  private handleSearch() {
-    this.$message.info('全局搜索功能开发中...')
   }
 
   private handleNotification() {
@@ -215,6 +203,8 @@ export default class extends Vue {
   ::v-deep .el-badge__content {
     background-color: var(--color-error, #EF4444);
     border-color: var(--color-error, #EF4444);
+    top: 12px;
+    right: 8px;
   }
 }
 
