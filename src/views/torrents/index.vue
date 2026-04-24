@@ -2459,3 +2459,4 @@ export default class extends Vue {
     opacity: 0.6;
   }
 }
+</style>
