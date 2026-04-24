@@ -18,7 +18,7 @@
       <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="notification-badge">
         <el-button
           class="icon-button"
-          icon="el-icon-alarm-clock"
+          icon="el-icon-bell"
           circle
           @click="handleNotification"
         />

@@ -51,7 +51,7 @@
           v-for="item in notifications"
           :key="item.id"
           :notification="item"
-          @read="handleRead"
+          @toggle-read="handleToggleRead"
           @delete="handleDelete"
         />
         <div v-if="hasMore" class="load-more">
@@ -145,6 +145,19 @@ export default class extends Vue {
 
   private async handleRead(id: number) {
     await NotificationModule.MarkAsRead(id)
+  }
+
+  private async handleToggleRead(id: number) {
+    const notification = this.notifications.find(n => n.id === id)
+    if (notification) {
+      if (notification.is_read) {
+        // 标记为未读
+        await NotificationModule.MarkAsUnread(id)
+      } else {
+        // 标记为已读
+        await NotificationModule.MarkAsRead(id)
+      }
+    }
   }
 
   private async handleReadAll() {

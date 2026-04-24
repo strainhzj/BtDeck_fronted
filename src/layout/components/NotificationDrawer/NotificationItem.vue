@@ -24,9 +24,14 @@
 
     <!-- 操作按钮 -->
     <div class="notification-ops">
-      <el-tooltip v-if="!notification.is_read" content="标记已读" placement="top">
-        <el-button type="text" size="mini" @click.stop="$emit('read', notification.id)">
-          <i class="el-icon-check" />
+      <el-tooltip :content="notification.is_read ? '标记未读' : '标记已读'" placement="top">
+        <el-button
+          type="text"
+          size="mini"
+          :class="{ 'btn-read': notification.is_read }"
+          @click.stop="$emit('toggle-read', notification.id)"
+        >
+          <i :class="notification.is_read ? 'el-icon-refresh-left' : 'el-icon-check'" />
         </el-button>
       </el-tooltip>
       <el-tooltip content="删除" placement="top">
@@ -188,6 +193,11 @@ export default class extends Vue {
   .btn-delete {
     color: var(--color-text-tertiary, #9CA3AF);
     &:hover { color: var(--color-error, #EF4444); }
+  }
+
+  .btn-read {
+    color: var(--color-text-tertiary, #9CA3AF);
+    &:hover { color: var(--color-primary, #059669); }
   }
 }
 </style>

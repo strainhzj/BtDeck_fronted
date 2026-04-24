@@ -4,6 +4,7 @@ import {
   getNotificationList,
   getUnreadCount,
   markAsRead,
+  markAsUnread,
   markAllAsRead,
   deleteNotification,
   NotificationItem
@@ -16,6 +17,7 @@ export interface INotificationState {
   total: number
   page: number
   loading: boolean
+  currentFilter: { page?: number; type?: string; is_read?: boolean }
 }
 
 @Module({ dynamic: true, store, name: 'notification' })
@@ -26,6 +28,7 @@ class Notification extends VuexModule implements INotificationState {
   public total = 0
   public page = 1
   public loading = false
+  public currentFilter: { page?: number; type?: string; is_read?: boolean } = {}
 
   @Mutation
   private SET_DRAWER_VISIBLE(visible: boolean) {
@@ -48,6 +51,11 @@ class Notification extends VuexModule implements INotificationState {
     this.loading = loading
   }
 
+  @Mutation
+  private SET_CURRENT_FILTER(filter: { page?: number; type?: string; is_read?: boolean }) {
+    this.currentFilter = filter
+  }
+
   @Action({ rawError: true })
   public ToggleDrawer(visible?: boolean) {
     this.SET_DRAWER_VISIBLE(visible !== undefined ? visible : !this.drawerVisible)
@@ -67,6 +75,10 @@ class Notification extends VuexModule implements INotificationState {
 
   @Action({ rawError: true })
   public async FetchNotifications(payload?: { page?: number; type?: string; is_read?: boolean }) {
+    // 保存当前筛选条件
+    if (payload) {
+      this.SET_CURRENT_FILTER(payload)
+    }
     this.SET_LOADING(true)
     try {
       const res = await getNotificationList({
@@ -86,12 +98,18 @@ class Notification extends VuexModule implements INotificationState {
   }
 
   @Action({ rawError: true })
+  public async RefreshNotifications() {
+    // 使用当前保存的筛选条件刷新列表
+    await this.FetchNotifications(this.currentFilter)
+  }
+
+  @Action({ rawError: true })
   public async MarkAsRead(id: number) {
     try {
       const res = await markAsRead(id)
       if (res.code === '200') {
-        // 刷新列表和未读数
-        await this.FetchNotifications()
+        // 使用当前筛选条件刷新列表
+        await this.RefreshNotifications()
         await this.FetchUnreadCount()
       }
     } catch (e) {
@@ -104,7 +122,20 @@ class Notification extends VuexModule implements INotificationState {
     try {
       const res = await markAllAsRead()
       if (res.code === '200') {
-        await this.FetchNotifications()
+        await this.RefreshNotifications()
+        await this.FetchUnreadCount()
+      }
+    } catch (e) {
+      // 静默失败
+    }
+  }
+
+  @Action({ rawError: true })
+  public async MarkAsUnread(id: number) {
+    try {
+      const res = await markAsUnread(id)
+      if (res.code === '200') {
+        await this.RefreshNotifications()
         await this.FetchUnreadCount()
       }
     } catch (e) {
@@ -117,7 +148,7 @@ class Notification extends VuexModule implements INotificationState {
     try {
       const res = await deleteNotification(id)
       if (res.code === '200') {
-        await this.FetchNotifications()
+        await this.RefreshNotifications()
         await this.FetchUnreadCount()
       }
     } catch (e) {

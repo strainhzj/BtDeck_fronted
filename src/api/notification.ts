@@ -66,8 +66,20 @@ export function getUnreadCount(): Promise<ApiResponse<{ count: number }>> {
  */
 export function markAsRead(id: number): Promise<ApiResponse<any>> {
   return request({
-    url: `/notifications/${id}/read`,
-    method: 'put'
+    url: '/notifications/mark-read',
+    method: 'put',
+    params: { notification_id: id }
+  }) as unknown as Promise<ApiResponse<any>>
+}
+
+/**
+ * 标记通知为未读
+ */
+export function markAsUnread(id: number): Promise<ApiResponse<any>> {
+  return request({
+    url: '/notifications/mark-unread',
+    method: 'put',
+    params: { notification_id: id }
   }) as unknown as Promise<ApiResponse<any>>
 }
 
