@@ -33,6 +33,17 @@
 
 → [详细规范](./docs/constraints/vue-async-context.md)
 
+## 功能模块
+
+### 通知中心
+
+- **组件**: `src/layout/components/NotificationDrawer/` — 全局右侧抽屉（el-drawer）
+- **Vuex**: `src/store/modules/notification.ts` — `NotificationModule`
+- **API**: `src/api/notification.ts`
+- **触发入口**: Navbar 闹钟图标 → `NotificationModule.ToggleDrawer(true)`
+- **轮询**: 60秒轮询 `/notifications/unread-count` 更新徽章数字
+- **约束**: 通知中心是全局组件，位于 Layout 层级，不属于任何路由页面。使用 `el-drawer` 从右侧滑出，自带遮罩层。
+
 ## 项目结构
 
 ```
