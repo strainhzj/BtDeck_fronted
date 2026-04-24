@@ -18,7 +18,7 @@
       <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="notification-badge">
         <el-button
           class="icon-button"
-          icon="el-icon-bell"
+          icon="el-icon-alarm-clock"
           circle
           @click="handleNotification"
         />
@@ -58,6 +58,7 @@
 <script lang="ts">
 import { Component, Vue } from 'vue-property-decorator'
 import { UserModule } from '@/store/modules/user'
+import { NotificationModule } from '@/store/modules/notification'
 import Breadcrumb from '@/components/Breadcrumb/index.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher/index.vue'
 
@@ -69,8 +70,6 @@ import ThemeSwitcher from '@/components/ThemeSwitcher/index.vue'
   }
 })
 export default class extends Vue {
-  private notificationCount = 0 // 通知数量
-
   get avatar() {
     return UserModule.avatar
   }
@@ -79,8 +78,12 @@ export default class extends Vue {
     return UserModule.name || '管理员'
   }
 
+  get notificationCount() {
+    return NotificationModule.unreadCount
+  }
+
   private handleNotification() {
-    this.$message.info('通知中心功能开发中...')
+    NotificationModule.ToggleDrawer(true)
   }
 
   private handleUserAction(command: string) {
