@@ -1,4 +1,5 @@
 <template>
+  <div>
   <el-drawer
     :visible.sync="drawerVisible"
     direction="rtl"
@@ -53,6 +54,7 @@
           :notification="item"
           @toggle-read="handleToggleRead"
           @delete="handleDelete"
+          @view="handleView"
         />
         <div v-if="hasMore" class="load-more">
           <el-button type="text" size="small" @click="loadMore">加载更多</el-button>
@@ -66,11 +68,34 @@
       </div>
     </div>
   </el-drawer>
+
+  <!-- 通知详情弹窗 -->
+  <el-dialog
+    :visible.sync="detailVisible"
+    :title="detailTitle"
+    width="500px"
+    append-to-body
+    custom-class="notification-detail-dialog"
+    @close="handleDetailClose"
+  >
+    <div class="detail-meta">
+      <el-tag size="mini" :type="detailTypeTag">{{ detailTypeLabel }}</el-tag>
+      <span class="detail-time">{{ detailTime }}</span>
+    </div>
+    <div class="detail-content" v-html="detailHtml" />
+    <div v-if="detailReleaseUrl" class="detail-footer">
+      <a :href="detailReleaseUrl" target="_blank" class="detail-link">
+        <i class="el-icon-link" /> 在 GitHub 上查看完整 Release
+      </a>
+    </div>
+  </el-dialog>
+  </div>
 </template>
 
 <script lang="ts">
 import { Component, Vue } from 'vue-property-decorator'
 import { NotificationModule } from '@/store/modules/notification'
+import { NotificationItem } from '@/api/notification'
 import NotificationItemComp from './NotificationItem.vue'
 
 @Component({
@@ -82,6 +107,14 @@ import NotificationItemComp from './NotificationItem.vue'
 export default class extends Vue {
   private activeTab: string = 'all'
   private pollingTimer: ReturnType<typeof setInterval> | null = null
+
+  // 详情弹窗状态
+  private detailVisible: boolean = false
+  private detailTitle: string = ''
+  private detailContent: string = ''
+  private detailType: string = ''
+  private detailCreatedAt: string = ''
+  private detailExtraData: { release_url?: string } | null = null
 
   private tabs = [
     { label: '全部', value: 'all' },
@@ -166,6 +199,113 @@ export default class extends Vue {
 
   private async handleDelete(id: number) {
     await NotificationModule.DeleteNotification(id)
+  }
+
+  // --- 详情弹窗 ---
+
+  private get detailTypeLabel(): string {
+    return this.detailType === 'version_update' ? '版本更新' : '系统通知'
+  }
+
+  private get detailTypeTag(): string {
+    return this.detailType === 'version_update' ? 'success' : 'info'
+  }
+
+  private get detailTime(): string {
+    if (!this.detailCreatedAt) return ''
+    const date = new Date(this.detailCreatedAt)
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    })
+  }
+
+  private get detailHtml(): string {
+    if (!this.detailContent) return ''
+    // 按 Markdown 规则分块处理：先拆成行，逐行转换，再合并
+    const lines = this.detailContent.split('\n')
+    const html: string[] = []
+    let inList = false
+
+    for (const raw of lines) {
+      const line = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const trimmed = line.trim()
+
+      // 空行
+      if (trimmed === '') {
+        if (inList) { html.push('</ul>'); inList = false }
+        continue
+      }
+
+      // 标题
+      if (trimmed.startsWith('### ')) {
+        if (inList) { html.push('</ul>'); inList = false }
+        html.push(`<h4>${trimmed.slice(4)}</h4>`)
+        continue
+      }
+      if (trimmed.startsWith('## ')) {
+        if (inList) { html.push('</ul>'); inList = false }
+        html.push(`<h3>${trimmed.slice(3)}</h3>`)
+        continue
+      }
+      if (trimmed.startsWith('# ')) {
+        if (inList) { html.push('</ul>'); inList = false }
+        html.push(`<h2>${trimmed.slice(2)}</h2>`)
+        continue
+      }
+
+      // 分隔线
+      if (trimmed === '---') {
+        if (inList) { html.push('</ul>'); inList = false }
+        html.push('<hr />')
+        continue
+      }
+
+      // 列表项
+      if (trimmed.startsWith('- ')) {
+        if (!inList) { html.push('<ul>'); inList = true }
+        html.push(`<li>${trimmed.slice(2)}</li>`)
+        continue
+      }
+
+      // 普通段落
+      if (inList) { html.push('</ul>'); inList = false }
+      html.push(`<p>${trimmed}</p>`)
+    }
+    if (inList) html.push('</ul>')
+
+    // 内联格式：粗体、行内代码（在结构化输出上做替换）
+    return html
+      .join('\n')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+  }
+
+  private get detailReleaseUrl(): string {
+    return this.detailExtraData?.release_url || ''
+  }
+
+  private handleView(notification: NotificationItem) {
+    this.detailTitle = notification.title
+    this.detailContent = notification.content || ''
+    this.detailType = notification.type
+    this.detailCreatedAt = notification.created_at
+    this.detailExtraData = notification.extra_data
+    this.detailVisible = true
+
+    // 未读通知自动标记已读
+    if (!notification.is_read) {
+      NotificationModule.MarkAsRead(notification.id)
+    }
+  }
+
+  private handleDetailClose() {
+    this.detailVisible = false
+    this.detailTitle = ''
+    this.detailContent = ''
+    this.detailType = ''
+    this.detailCreatedAt = ''
+    this.detailExtraData = null
   }
 
   private startPolling() {
@@ -281,6 +421,84 @@ export default class extends Vue {
 .load-more {
   text-align: center;
   padding: var(--spacing-md, 12px) 0;
+}
+</style>
+
+<style lang="scss">
+/* 通知详情弹窗样式 */
+.notification-detail-dialog {
+  .el-dialog__body {
+    padding-top: 12px;
+  }
+
+  .detail-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .detail-time {
+    font-size: 12px;
+    color: #9CA3AF;
+  }
+
+  .detail-content {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #374151;
+    word-break: break-word;
+
+    h2 { font-size: 16px; margin: 12px 0 6px; font-weight: 600; color: #111827; }
+    h3 { font-size: 15px; margin: 10px 0 4px; font-weight: 600; color: #1F2937; }
+    h4 { font-size: 14px; margin: 8px 0 4px; font-weight: 600; color: #374151; }
+
+    p { margin: 4px 0; }
+
+    ul {
+      padding-left: 18px;
+      margin: 4px 0;
+      list-style-type: disc;
+    }
+
+    li {
+      margin: 2px 0;
+      line-height: 1.5;
+    }
+
+    strong { color: #111827; }
+
+    code {
+      background: #F3F4F6;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 13px;
+      color: #DC2626;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #E5E7EB;
+      margin: 8px 0;
+    }
+  }
+
+  .detail-footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #E5E7EB;
+  }
+
+  .detail-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: #059669;
+    text-decoration: none;
+
+    &:hover { text-decoration: underline; }
+  }
 }
 </style>
 

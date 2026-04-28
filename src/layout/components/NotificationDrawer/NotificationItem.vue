@@ -6,19 +6,13 @@
     </div>
 
     <!-- 内容区域 -->
-    <div class="notification-content">
+    <div class="notification-content" @click.stop="$emit('view', notification)">
       <div class="notification-header">
         <span class="notification-title">{{ notification.title }}</span>
         <span class="notification-time">{{ formattedTime }}</span>
       </div>
       <div v-if="notification.content" class="notification-body">
         {{ notification.content }}
-      </div>
-      <!-- 版本更新特有操作 -->
-      <div v-if="notification.type === 'version_update' && notification.extra_data?.release_url" class="notification-actions">
-        <a :href="notification.extra_data.release_url" target="_blank" class="action-link">
-          查看详情
-        </a>
       </div>
     </div>
 
@@ -135,6 +129,7 @@ export default class extends Vue {
 .notification-content {
   flex: 1;
   min-width: 0;
+  cursor: pointer;
 }
 
 .notification-header {
@@ -166,17 +161,6 @@ export default class extends Vue {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.notification-actions {
-  margin-top: 8px;
-}
-
-.action-link {
-  font-size: 13px;
-  color: var(--color-primary, #059669);
-  text-decoration: none;
-  &:hover { text-decoration: underline; }
 }
 
 .notification-ops {
