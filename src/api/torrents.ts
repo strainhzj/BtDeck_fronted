@@ -1137,8 +1137,8 @@ export function reannounceAll(): Promise<ApiResponse<ReannounceResponse>> {
  */
 export interface ActiveTorrentSpeed {
   hash: string
-  downloadSpeed: number  // KB/s
-  uploadSpeed: number    // KB/s
+  downloadSpeed: number  // bytes/s
+  uploadSpeed: number    // bytes/s
   num_seeds: number
   num_leechs: number
 }
