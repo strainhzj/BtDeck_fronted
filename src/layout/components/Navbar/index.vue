@@ -14,6 +14,14 @@
 
     <!-- 右侧区域 -->
     <div class="navbar-right">
+      <!-- 反馈按钮 -->
+      <el-button
+        class="icon-button feedback-button"
+        icon="el-icon-chat-dot-round"
+        circle
+        @click="handleFeedback"
+      />
+
       <!-- 通知中心 -->
       <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="notification-badge">
         <el-button
@@ -84,6 +92,10 @@ export default class extends Vue {
 
   private handleNotification() {
     NotificationModule.ToggleDrawer(true)
+  }
+
+  private handleFeedback() {
+    window.open('https://github.com/strainhzj/BtDeck/issues', '_blank')
   }
 
   private handleUserAction(command: string) {
