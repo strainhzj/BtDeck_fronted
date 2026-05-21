@@ -21,6 +21,11 @@ export interface StatusOption {
  */
 export const STATUS_OPTIONS: StatusOption[] = [
   {
+    label: '⚡ 活动',
+    value: 'active',
+    originalStates: []
+  },
+  {
     label: '⬆️ 做种中',
     value: 'seeding',
     originalStates: ['stalledUP', 'seeding', 'queuedUP']
@@ -56,6 +61,7 @@ export const STATUS_OPTIONS: StatusOption[] = [
  * 状态值到显示文本的映射
  */
 export const STATUS_TEXT_MAP: Record<string, string> = {
+  active: '活动',
   seeding: '做种中',
   downloading: '下载中',
   paused: '已暂停',
@@ -68,6 +74,7 @@ export const STATUS_TEXT_MAP: Record<string, string> = {
  * 状态值到图标的映射
  */
 export const STATUS_ICON_MAP: Record<string, string> = {
+  active: '⚡',
   seeding: '⬆️',
   downloading: '⬇️',
   paused: '⏸️',

@@ -628,8 +628,6 @@ export default class extends Vue {
   // 实时速度轮询
   private speedTimer: number | null = null
   private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number }> = {}
-  private speedPollingPending = false
-  private speedRequestCount = 0  // 请求计数器，用于检测潜在竞态
 
   // 分页相关
   private currentPage = 1
@@ -787,12 +785,21 @@ export default class extends Vue {
     try {
       const params = { ...this.listQuery }
 
+      // 检查是否需要前端过滤"活动"状态
+      const needFilterActive = params.status && Array.isArray(params.status) && params.status.includes('active')
+
       // 处理数组参数：转换为逗号分隔的字符串
       if (params.downloader_id && Array.isArray(params.downloader_id)) {
         params.downloader_id = params.downloader_id.join(',')
       }
       if (params.status && Array.isArray(params.status)) {
-        params.status = params.status.join(',')
+        // 移除 'active' 状态，不发送给后端
+        const filteredStatus = params.status.filter((s: string) => s !== 'active')
+        if (filteredStatus.length > 0) {
+          params.status = filteredStatus.join(',')
+        } else {
+          delete params.status
+        }
       }
 
       // 移除空值
@@ -807,14 +814,23 @@ export default class extends Vue {
 
       // 使用统一的响应处理工具
       const { list, total } = normalizePaginatedResponse<any>(response)
-      
+
       // 规范化种子数据并提供默认值
-      this.list = list.map(normalizeTorrent).map(item => ({
+      let normalizedList = list.map(normalizeTorrent).map(item => ({
         ...item,
         checked: false
       }))
-      
-      this.total = total
+
+      // 前端过滤"活动"状态：筛选出有速度的种子
+      if (needFilterActive) {
+        normalizedList = normalizedList.filter(item => {
+          const speed = this.activeSpeedMap[item.hash]
+          return speed && (speed.downloadSpeed > 0 || speed.uploadSpeed > 0)
+        })
+      }
+
+      this.list = normalizedList
+      this.total = needFilterActive ? normalizedList.length : total
     } catch (error) {
       const errorMessage = extractErrorMessage(error)
       console.error('获取种子列表失败:', error)
@@ -2013,19 +2029,6 @@ export default class extends Vue {
 
   /** 加载活跃种子实时速度 */
   private async loadActiveSpeed() {
-    // 防抖保护：已有请求在处理中
-    if (this.speedPollingPending) {
-      this.speedRequestCount++
-      // 记录潜在竞态（仅调试用）
-      if (this.speedRequestCount > 3) {
-        console.warn(`[速度轮询] 检测到高频调用，已忽略 ${this.speedRequestCount} 次请求`)
-      }
-      return
-    }
-
-    // 请求开始
-    this.speedPollingPending = true
-    this.speedRequestCount = 0
     const requestId = Date.now()
 
     try {
@@ -2050,24 +2053,23 @@ export default class extends Vue {
     } catch (e) {
       // 静默失败，不影响主流程
       console.debug(`[速度轮询] 请求 ${requestId} 失败:`, e)
-    } finally {
-      // 请求结束，允许下一次请求
-      this.speedPollingPending = false
     }
   }
 
-  /** 启动速度轮询（1秒间隔） */
+  /** 启动速度轮询（请求完成后等待1秒再发下一次） */
   private startSpeedPolling() {
-    this.loadActiveSpeed()
-    this.speedTimer = window.setInterval(() => {
-      this.loadActiveSpeed()
-    }, 1000)
+    const poll = async() => {
+      await this.loadActiveSpeed()
+      // 请求完成后等待1秒再发下一次
+      this.speedTimer = window.setTimeout(poll, 1000)
+    }
+    poll()
   }
 
   /** 停止速度轮询 */
   private stopSpeedPolling() {
     if (this.speedTimer) {
-      clearInterval(this.speedTimer)
+      clearTimeout(this.speedTimer)
       this.speedTimer = null
     }
   }
