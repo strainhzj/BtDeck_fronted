@@ -1133,18 +1133,19 @@ export function reannounceAll(): Promise<ApiResponse<ReannounceResponse>> {
 // ==================== 实时速度监控接口 ====================
 
 /**
- * 活跃种子速度数据
+ * 活跃种子实时数据（包含速度和进度）
  */
 export interface ActiveTorrentSpeed {
   hash: string
   downloadSpeed: number  // bytes/s
   uploadSpeed: number    // bytes/s
+  progress: number       // 下载进度（百分比，0-100）
   num_seeds: number
   num_leechs: number
 }
 
 /**
- * 获取活跃种子的实时速度（轻量级接口，用于1秒轮询）
+ * 获取活跃种子的实时速度和进度（轻量级接口，用于1秒轮询）
  * 仅返回 downloadSpeed > 0 或 uploadSpeed > 0 的种子
  */
 export function getActiveTorrents(): Promise<ApiResponse<ActiveTorrentSpeed[]>> {

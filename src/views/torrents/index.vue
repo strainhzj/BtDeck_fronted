@@ -44,6 +44,13 @@
           :value="option.value"
         />
         </el-select>
+        <el-checkbox
+          v-model="listQuery.showActiveOnly"
+          class="active-only-checkbox"
+          @change="handleFilter"
+        >
+          仅显示活动种子
+        </el-checkbox>
         <el-button class="search-btn" @click="handleFilter">
           搜索
         </el-button>
@@ -627,7 +634,7 @@ export default class extends Vue {
 
   // 实时速度轮询
   private speedTimer: number | null = null
-  private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number }> = {}
+  private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number, progress: number }> = {}
 
   // 分页相关
   private currentPage = 1
@@ -698,6 +705,7 @@ export default class extends Vue {
     name_like: '',
     downloader_id: [] as string[],  // 支持多选
     status: [] as string[],         // 支持多选
+    showActiveOnly: false,          // 仅显示活动种子（有速度的种子）
     sort_by: 'added_date',
     sort_order: 'desc'
   }
@@ -785,21 +793,18 @@ export default class extends Vue {
     try {
       const params = { ...this.listQuery }
 
-      // 检查是否需要前端过滤"活动"状态
-      const needFilterActive = params.status && Array.isArray(params.status) && params.status.includes('active')
+      // 检查是否需要前端过滤"活动"种子
+      const showActiveOnly = params.showActiveOnly === true
+
+      // 移除 showActiveOnly 属性，不发送给后端
+      delete params.showActiveOnly
 
       // 处理数组参数：转换为逗号分隔的字符串
       if (params.downloader_id && Array.isArray(params.downloader_id)) {
         params.downloader_id = params.downloader_id.join(',')
       }
       if (params.status && Array.isArray(params.status)) {
-        // 移除 'active' 状态，不发送给后端
-        const filteredStatus = params.status.filter((s: string) => s !== 'active')
-        if (filteredStatus.length > 0) {
-          params.status = filteredStatus.join(',')
-        } else {
-          delete params.status
-        }
+        params.status = params.status.join(',')
       }
 
       // 移除空值
@@ -821,8 +826,8 @@ export default class extends Vue {
         checked: false
       }))
 
-      // 前端过滤"活动"状态：筛选出有速度的种子
-      if (needFilterActive) {
+      // 前端过滤"仅显示活动种子"：筛选出有速度的种子
+      if (showActiveOnly) {
         normalizedList = normalizedList.filter(item => {
           const speed = this.activeSpeedMap[item.hash]
           return speed && (speed.downloadSpeed > 0 || speed.uploadSpeed > 0)
@@ -830,7 +835,7 @@ export default class extends Vue {
       }
 
       this.list = normalizedList
-      this.total = needFilterActive ? normalizedList.length : total
+      this.total = showActiveOnly ? normalizedList.length : total
     } catch (error) {
       const errorMessage = extractErrorMessage(error)
       console.error('获取种子列表失败:', error)
@@ -2027,14 +2032,14 @@ export default class extends Vue {
     return type === 'download' ? (torrent.downloadSpeed ?? null) : (torrent.uploadSpeed ?? null)
   }
 
-  /** 加载活跃种子实时速度 */
+  /** 加载活跃种子实时速度和进度 */
   private async loadActiveSpeed() {
     const requestId = Date.now()
 
     try {
       const res = await getActiveTorrents()
       if (res.code === '200' && res.data) {
-        const map: Record<string, { downloadSpeed: number, uploadSpeed: number }> = {}
+        const map: Record<string, { downloadSpeed: number, uploadSpeed: number, progress: number }> = {}
         const torrents = res.data as ActiveTorrentSpeed[]
         torrents.forEach((t: ActiveTorrentSpeed) => {
           // 防御性检查：确保hash字段存在
@@ -2042,9 +2047,19 @@ export default class extends Vue {
             console.warn('[速度轮询] 跳过无效种子数据:', t)
             return
           }
+          // 更新速度映射（用于排序和高亮）
           map[t.hash] = {
             downloadSpeed: t.downloadSpeed ?? 0,
-            uploadSpeed: t.uploadSpeed ?? 0
+            uploadSpeed: t.uploadSpeed ?? 0,
+            progress: t.progress ?? 0
+          }
+
+          // 直接更新列表中对应种子的实时数据
+          const torrentInList = this.list.find(item => item.hash === t.hash)
+          if (torrentInList) {
+            torrentInList.downloadSpeed = t.downloadSpeed ?? 0
+            torrentInList.uploadSpeed = t.uploadSpeed ?? 0
+            torrentInList.progress = t.progress ?? 0
           }
         })
         this.activeSpeedMap = map
@@ -2179,6 +2194,21 @@ export default class extends Vue {
   // 优化下拉框宽度自适应
   ::v-deep .el-select__tags {
     max-width: calc(100% - 30px);
+  }
+}
+
+// 活动种子复选框样式
+.active-only-checkbox {
+  margin-left: 12px;
+  margin-right: 12px;
+
+  ::v-deep .el-checkbox__label {
+    color: var(--color-text-primary);
+    font-size: 14px;
+  }
+
+  ::v-deep .el-checkbox__input.is-checked + .el-checkbox__label {
+    color: var(--color-accent-primary);
   }
 }
 
