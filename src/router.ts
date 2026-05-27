@@ -84,6 +84,16 @@ const router = new Router({
           }
         },
         {
+          path: 'traditional',
+          component: () => import(/* webpackChunkName: "torrents-traditional" */ '@/views/torrents/TraditionalView.vue'),
+          meta: {
+            keepAlive: true,
+            title: '种子列表（传统模式）',
+            icon: 'list',
+            hidden: true
+          }
+        },
+        {
           path: 'file-management',
           component: () => import(/* webpackChunkName: "file-management" */ '@/views/torrents/FileManagement.vue'),
           meta: {
