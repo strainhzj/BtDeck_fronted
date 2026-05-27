@@ -931,45 +931,322 @@ export default class extends Vue {
     this.handleFilter()
   }
 
-  // 批量操作（复用现有逻辑）
+  // ====== 辅助方法 ======
+  private groupTorrentsByDownloader(torrents: any[]) {
+    const groups: Record<string, any[]> = {}
+    torrents.forEach(torrent => {
+      if (!torrent) {
+        console.warn('跳过空种子对象')
+        return
+      }
+
+      const downloaderId = torrent?.downloader_id || torrent?.downloaderId
+
+      if (!downloaderId) {
+        console.warn('种子缺少下载器ID，跳过:', torrent)
+        return
+      }
+
+      if (!groups[downloaderId]) {
+        groups[downloaderId] = []
+      }
+      groups[downloaderId].push(torrent)
+    })
+    return groups
+  }
+
+  private async deleteTorrentsInternal(torrents: any[], deleteData: number) {
+    const results = { successCount: 0, failCount: 0 }
+
+    // 按下载器分组
+    const groups = this.groupTorrentsByDownloader(torrents)
+
+    // 并行调用所有下载器的删除操作
+    const promises = Object.entries(groups).map(([downloaderId, groupTorrents]) => {
+      const hashes = groupTorrents.map(t => t.hash)
+      return deleteTorrents({ downloader_id: downloaderId, hashes, deleteData })
+    })
+
+    const responses = await Promise.allSettled(promises)
+
+    responses.forEach((response, index) => {
+      if (response.status === 'fulfilled' && response.value.code === '200') {
+        results.successCount += Object.keys(groups)[index].length
+      } else {
+        results.failCount += Object.keys(groups)[index].length
+      }
+    })
+
+    return results
+  }
+
+  // ====== 批量操作 ======
   private async handleBatchStart() {
-    // TODO: 实现批量开始逻辑
-    console.log('批量开始:', this.multipleSelection)
+    if (this.multipleSelection.length === 0) return
+    try {
+      // 按下载器ID分组
+      const groups = this.groupTorrentsByDownloader(this.multipleSelection)
+
+      // 并行调用所有下载器的恢复操作
+      const promises = Object.entries(groups).map(([downloaderId, torrents]) => {
+        const hashes = torrents.map(t => t.hash)
+        return resumeTorrents({ downloader_id: downloaderId, hashes })
+      })
+
+      const responses = await Promise.allSettled(promises)
+      let successCount = 0
+      let failCount = 0
+
+      responses.forEach(response => {
+        if (response.status === 'fulfilled' && response.value.code === '200') {
+          successCount++
+        } else {
+          failCount++
+        }
+      })
+
+      if (failCount === 0) {
+        this.$message.success(`成功开始 ${successCount} 个种子`)
+      } else if (successCount === 0) {
+        this.$message.error(`批量开始失败，共 ${failCount} 个种子开始失败`)
+      } else {
+        this.$message.warning(`部分开始成功：成功 ${successCount} 个，失败 ${failCount} 个`)
+      }
+
+      this.getList()
+    } catch (error) {
+      console.error('批量开始失败:', error)
+      this.$message.error('批量开始失败')
+    }
   }
 
   private async handleBatchPause() {
-    // TODO: 实现批量暂停逻辑
-    console.log('批量暂停:', this.multipleSelection)
+    if (this.multipleSelection.length === 0) return
+    try {
+      // 按下载器ID分组
+      const groups = this.groupTorrentsByDownloader(this.multipleSelection)
+
+      // 并行调用所有下载器的暂停操作
+      const promises = Object.entries(groups).map(([downloaderId, torrents]) => {
+        const hashes = torrents.map(t => t.hash)
+        return pauseTorrents({ downloader_id: downloaderId, hashes })
+      })
+
+      const responses = await Promise.allSettled(promises)
+      let successCount = 0
+      let failCount = 0
+
+      responses.forEach(response => {
+        if (response.status === 'fulfilled' && response.value.code === '200') {
+          successCount++
+        } else {
+          failCount++
+        }
+      })
+
+      if (failCount === 0) {
+        this.$message.success(`成功暂停 ${successCount} 个种子`)
+      } else if (successCount === 0) {
+        this.$message.error(`批量暂停失败，共 ${failCount} 个种子暂停失败`)
+      } else {
+        this.$message.warning(`部分暂停成功：成功 ${successCount} 个，失败 ${failCount} 个`)
+      }
+
+      this.getList()
+    } catch (error) {
+      console.error('批量暂停失败:', error)
+      this.$message.error('批量暂停失败')
+    }
   }
 
   private async handleBatchDelete() {
-    // TODO: 实现批量删除逻辑
-    console.log('批量删除:', this.multipleSelection)
+    if (this.multipleSelection.length === 0) return
+    this.$confirm(`确定要删除选中的 ${this.multipleSelection.length} 个种子吗？`, '批量删除确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(async() => {
+      this.$confirm('是否同时删除这些种子对应的数据文件？', '删除数据文件', {
+        confirmButtonText: '同时删除种子和数据',
+        cancelButtonText: '仅删除种子，保留数据',
+        distinguishCancelAndClose: true,
+        type: 'warning'
+      }).then(async() => {
+        await this.performBatchDelete(1)
+      }).catch((action) => {
+        if (action === 'cancel') {
+          this.performBatchDelete(0)
+        }
+      })
+    }).catch(() => undefined)
+  }
+
+  private async performBatchDelete(deleteData: number) {
+    const results = await this.deleteTorrentsInternal(this.multipleSelection, deleteData)
+
+    const dataFileText = deleteData === 1 ? '（已删除数据文件）' : '（已保留数据文件）'
+    if (results.failCount === 0) {
+      this.$message.success(`成功删除 ${results.successCount} 个种子 ${dataFileText}`)
+    } else if (results.successCount === 0) {
+      this.$message.error(`批量删除失败，共 ${results.failCount} 个种子删除失败`)
+    } else {
+      this.$message.warning(`部分删除成功：成功 ${results.successCount} 个，失败 ${results.failCount} 个 ${dataFileText}`)
+    }
+
+    this.getList()
   }
 
   private async handleBatchRecheck() {
-    // TODO: 实现批量重检逻辑
-    console.log('批量重检:', this.multipleSelection)
+    if (this.multipleSelection.length === 0) return
+    try {
+      // 按下载器ID分组
+      const groups = this.groupTorrentsByDownloader(this.multipleSelection)
+
+      // 并行调用所有下载器的重检操作
+      const promises = Object.entries(groups).map(([downloaderId, torrents]) => {
+        const hashes = torrents.map(t => t.hash)
+        return recheckTorrents({ downloader_id: downloaderId, hashes })
+      })
+
+      const responses = await Promise.allSettled(promises)
+      let successCount = 0
+      let failCount = 0
+
+      responses.forEach(response => {
+        if (response.status === 'fulfilled' && response.value.code === '200') {
+          successCount++
+        } else {
+          failCount++
+        }
+      })
+
+      if (failCount === 0) {
+        this.$message.success(`成功重检 ${successCount} 个种子`)
+      } else if (successCount === 0) {
+        this.$message.error(`批量重检失败，共 ${failCount} 个种子重检失败`)
+      } else {
+        this.$message.warning(`部分重检成功：成功 ${successCount} 个，失败 ${failCount} 个`)
+      }
+
+      this.getList()
+    } catch (error) {
+      console.error('批量重检失败:', error)
+      this.$message.error('批量重检失败')
+    }
   }
 
+  // ====== 单个种子操作 ======
   private async handleTogglePause(torrent: any) {
-    // TODO: 实现单个种子暂停/开始逻辑
-    console.log('切换暂停状态:', torrent)
+    if (!torrent) return
+
+    const downloaderId = torrent.downloader_id || torrent.downloaderId
+    if (!downloaderId) {
+      this.$message.error('种子缺少下载器信息')
+      return
+    }
+
+    try {
+      if (torrent.status === 'paused') {
+        await resumeTorrents({ downloader_id: downloaderId, hashes: [torrent.hash] })
+        this.$message.success('开始任务成功')
+      } else {
+        await pauseTorrents({ downloader_id: downloaderId, hashes: [torrent.hash] })
+        this.$message.success('暂停任务成功')
+      }
+      this.getList()
+    } catch (error) {
+      console.error('切换暂停状态失败:', error)
+      this.$message.error('操作失败')
+    }
   }
 
   private async handleRecheck(torrent: any) {
-    // TODO: 实现单个种子重检逻辑
-    console.log('重检种子:', torrent)
+    if (!torrent) return
+
+    const downloaderId = torrent.downloader_id || torrent.downloaderId
+    if (!downloaderId) {
+      this.$message.error('种子缺少下载器信息')
+      return
+    }
+
+    try {
+      await recheckTorrents({ downloader_id: downloaderId, hashes: [torrent.hash] })
+      this.$message.success('重新检查任务已提交')
+      this.getList()
+    } catch (error) {
+      console.error('重检种子失败:', error)
+      this.$message.error('重检失败')
+    }
   }
 
   private async handleDelete(torrent: any) {
-    // TODO: 实现单个种子删除逻辑
-    console.log('删除种子:', torrent)
+    if (!torrent) return
+
+    this.$confirm(`确定要删除种子"${torrent.name}"吗？`, '删除确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(async() => {
+      this.$confirm('是否同时删除数据文件？', '删除数据文件', {
+        confirmButtonText: '同时删除种子和数据',
+        cancelButtonText: '仅删除种子，保留数据',
+        distinguishCancelAndClose: true,
+        type: 'warning'
+      }).then(async() => {
+        await this.performSingleDelete(torrent, 1)
+      }).catch((action) => {
+        if (action === 'cancel') {
+          this.performSingleDelete(torrent, 0)
+        }
+      })
+    }).catch(() => undefined)
+  }
+
+  private async performSingleDelete(torrent: any, deleteData: number) {
+    const downloaderId = torrent.downloader_id || torrent.downloaderId
+    if (!downloaderId) {
+      this.$message.error('种子缺少下载器信息')
+      return
+    }
+
+    try {
+      const response = await deleteTorrents({
+        downloader_id: downloaderId,
+        hashes: [torrent.hash],
+        deleteData
+      })
+
+      if (response.code === '200') {
+        const dataFileText = deleteData === 1 ? '（已删除数据文件）' : '（已保留数据文件）'
+        this.$message.success(`删除种子成功 ${dataFileText}`)
+        this.getList()
+        // 如果删除的是当前详情面板的种子，关闭详情面板
+        if (this.currentRow?.hash === torrent.hash) {
+          this.currentRow = null
+        }
+      } else {
+        this.$message.error('删除种子失败')
+      }
+    } catch (error) {
+      console.error('删除种子失败:', error)
+      this.$message.error('删除种子失败')
+    }
   }
 
   private async handleAdd(torrentData: any) {
-    // TODO: 实现添加种子逻辑
-    console.log('添加种子:', torrentData)
+    try {
+      const response = await addTorrent(torrentData)
+      if (response.code === '200') {
+        this.$message.success('添加种子成功')
+        this.showAddDialog = false
+        this.getList()
+      } else {
+        this.$message.error(response.msg || '添加种子失败')
+      }
+    } catch (error) {
+      console.error('添加种子失败:', error)
+      this.$message.error('添加种子失败')
+    }
   }
 }
 </script>
