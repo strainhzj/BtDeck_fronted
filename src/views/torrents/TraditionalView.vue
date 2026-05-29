@@ -526,6 +526,7 @@ import {
   getDownloaderList,
   type DownloaderSimple
 } from '@/api/torrents'
+import { getAllCategories, getAllTags } from '@/api/tag-management'
 import { STATUS_OPTIONS, getStatusIcon, getStatusText } from '@/constants/status-config'
 import {
   formatFileSize,
@@ -565,6 +566,10 @@ export default class extends Vue {
   // 实时速度轮询
   private speedTimer: number | null = null
   private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number, progress: number }> = {}
+
+  // 分类和标签数据
+  private categoryList: string[] = []
+  private tagList: string[] = []
 
   // 分页
   private currentPage = 1
@@ -630,16 +635,18 @@ export default class extends Vue {
   }
 
   get sortedList() {
-    // 复用现有排序逻辑：活跃种子优先
-    return this.list.slice().sort((a, b) => {
-      const aActive = !!this.activeSpeedMap[a.hash]
-      const bActive = !!this.activeSpeedMap[b.hash]
+    // 过滤掉 null/undefined 值，并排序：活跃种子优先
+    return this.list
+      .filter(item => item && item.hash)
+      .sort((a, b) => {
+        const aActive = !!this.activeSpeedMap[a.hash]
+        const bActive = !!this.activeSpeedMap[b.hash]
 
-      if (aActive && !bActive) return -1
-      if (!aActive && bActive) return 1
+        if (aActive && !bActive) return -1
+        if (!aActive && bActive) return 1
 
-      return 0
-    })
+        return 0
+      })
   }
 
   get globalDownloadSpeed() {
@@ -678,28 +685,34 @@ export default class extends Vue {
   }
 
   get categoryFilterItems(): FilterItem[] {
-    // TODO: 从 API 获取分类列表
-    return [
+    const items = [
       { icon: '📂', label: '全部', value: '' },
-      { icon: '🎬', label: '电影', value: '电影' },
-      { icon: '📺', label: '剧集', value: '剧集' },
-      { icon: '🎵', label: '音乐', value: '音乐' },
-      { icon: '💿', label: '软件', value: '软件' }
+      ...this.categoryList.map(name => ({
+        icon: '📁',
+        label: name,
+        value: name
+      }))
     ]
+    return items
   }
 
   get tagFilterItems(): FilterItem[] {
-    // TODO: 从 API 获取标签列表
-    return [
-      { icon: '🏷', label: 'PT', value: 'PT' },
-      { icon: '🏷', label: 'BT', value: 'BT' }
+    const items = [
+      { icon: '🏷', label: '全部', value: '' },
+      ...this.tagList.map(name => ({
+        icon: '🏷',
+        label: name,
+        value: name
+      }))
     ]
+    return items
   }
 
   // ====== 生命周期 ======
   public async created() {
     this.debouncedSearch = debounce(this.handleFilter, 300)
     await this.fetchDownloaderList()
+    await this.fetchCategoryAndTags()
     await this.getList()
     this.startSpeedPolling()
   }
@@ -761,6 +774,26 @@ export default class extends Vue {
     }
   }
 
+  private async fetchCategoryAndTags() {
+    try {
+      // 并发获取分类和标签
+      const [categoryResponse, tagResponse] = await Promise.all([
+        getAllCategories(),
+        getAllTags()
+      ])
+
+      if (categoryResponse.code === '200' && categoryResponse.data) {
+        this.categoryList = categoryResponse.data
+      }
+
+      if (tagResponse.code === '200' && tagResponse.data) {
+        this.tagList = tagResponse.data
+      }
+    } catch (error) {
+      console.error('获取分类和标签失败:', error)
+    }
+  }
+
   // ====== 实时速度轮询 ======
   private startSpeedPolling() {
     const poll = async () => {
@@ -810,6 +843,9 @@ export default class extends Vue {
   }
 
   private getTorrentSpeed(torrent: any, type: 'download' | 'upload'): number | null {
+    if (!torrent || !torrent.hash) {
+      return null
+    }
     const active = this.activeSpeedMap[torrent.hash]
     if (active) {
       return type === 'download' ? active.downloadSpeed : active.uploadSpeed
