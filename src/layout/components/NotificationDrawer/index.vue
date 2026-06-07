@@ -314,7 +314,7 @@ export default class extends Vue {
   }
 
   beforeDestroy() {
-    // 轮询由 store 管理，无需手动清理
+    NotificationModule.StopUnreadPolling()
   }
 }
 </script>

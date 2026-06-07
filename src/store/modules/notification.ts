@@ -81,11 +81,12 @@ class Notification extends VuexModule implements INotificationState {
 
   @Action({ rawError: true })
   public async FetchNotifications(payload?: { page?: number, type?: string, is_read?: boolean }) {
-    // 合并筛选条件（浅合并，保留之前的 type/is_read）
+    // 合并筛选条件，并同步 page 为实际使用的值
+    const page = payload?.page || 1
     if (payload) {
       this.SET_CURRENT_FILTER(payload)
     }
-    const page = payload?.page || 1
+    this.SET_CURRENT_FILTER({ page })
     const mergedFilter = this.currentFilter
     this.SET_LOADING(true)
     try {
