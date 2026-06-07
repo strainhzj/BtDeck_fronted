@@ -634,6 +634,7 @@ export default class extends Vue {
 
   // 实时速度轮询
   private speedTimer: number | null = null
+  private _isDestroyed = false
   private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number, progress: number }> = {}
 
   // 分页相关
@@ -2073,9 +2074,11 @@ export default class extends Vue {
 
   /** 启动速度轮询（请求完成后等待1秒再发下一次） */
   private startSpeedPolling() {
+    this._isDestroyed = false
     const poll = async() => {
       await this.loadActiveSpeed()
-      // 请求完成后等待1秒再发下一次
+      // 组件已销毁时不再调度下一次
+      if (this._isDestroyed) return
       this.speedTimer = window.setTimeout(poll, 1000)
     }
     poll()
@@ -2083,6 +2086,7 @@ export default class extends Vue {
 
   /** 停止速度轮询 */
   private stopSpeedPolling() {
+    this._isDestroyed = true
     if (this.speedTimer) {
       clearTimeout(this.speedTimer)
       this.speedTimer = null

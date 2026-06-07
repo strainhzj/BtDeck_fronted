@@ -16,7 +16,7 @@ BTDeck 前端提供统一的 BitTorrent 客户端管理界面，支持种子管�
 
 开始任何工作前，按顺序执行：
 
-```
+```text
 1. 阅读 AGENTS.md（本文件）
 2. 阅读 CLAUDE.md（前端技术约束）
 3. 阅读 docs/constraints/（详细规范）
@@ -100,7 +100,7 @@ BTDeck 前端提供统一的 BitTorrent 客户端管理界面，支持种子管�
 
 ## 项目结构
 
-```
+```text
 BtDeck_fronted/
 ├── src/
 │   ├── api/                       # API接口定义 (13个模块)
@@ -200,7 +200,7 @@ npm run lint:vuex-action
 
 ## 会话结束清单
 
-```
+```text
 1. 更新 PROGRESS.md（记录完成的工作和决策）
 2. 更新 feature_list.json（更新功能状态）
 3. 填写 session-handoff.md（交接信息）

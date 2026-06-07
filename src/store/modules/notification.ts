@@ -47,13 +47,19 @@ class Notification extends VuexModule implements INotificationState {
   }
 
   @Mutation
+  private APPEND_NOTIFICATIONS(payload: { list: NotificationItem[], total: number }) {
+    this.notifications = [...this.notifications, ...payload.list]
+    this.total = payload.total
+  }
+
+  @Mutation
   private SET_LOADING(loading: boolean) {
     this.loading = loading
   }
 
   @Mutation
   private SET_CURRENT_FILTER(filter: { page?: number, type?: string, is_read?: boolean }) {
-    this.currentFilter = filter
+    this.currentFilter = { ...this.currentFilter, ...filter }
   }
 
   @Action({ rawError: true })
@@ -75,20 +81,27 @@ class Notification extends VuexModule implements INotificationState {
 
   @Action({ rawError: true })
   public async FetchNotifications(payload?: { page?: number, type?: string, is_read?: boolean }) {
-    // 保存当前筛选条件
+    // 合并筛选条件（浅合并，保留之前的 type/is_read）
     if (payload) {
       this.SET_CURRENT_FILTER(payload)
     }
+    const page = payload?.page || 1
+    const mergedFilter = this.currentFilter
     this.SET_LOADING(true)
     try {
       const res = await getNotificationList({
-        page: payload?.page || 1,
+        page,
         pageSize: 20,
-        type: payload?.type,
-        is_read: payload?.is_read
+        type: mergedFilter.type,
+        is_read: mergedFilter.is_read
       })
       if (res.code === '200') {
-        this.SET_NOTIFICATIONS({ list: res.data.list, total: res.data.total })
+        const data = { list: res.data.list, total: res.data.total }
+        if (page > 1) {
+          this.APPEND_NOTIFICATIONS(data)
+        } else {
+          this.SET_NOTIFICATIONS(data)
+        }
       }
     } catch (e) {
       // 静默失败
@@ -141,6 +154,31 @@ class Notification extends VuexModule implements INotificationState {
     } catch (e) {
       // 静默失败
     }
+  }
+
+  private _unreadTimerId: ReturnType<typeof setInterval> | null = null
+
+  @Action({ rawError: true })
+  public StartUnreadPolling() {
+    this.StopUnreadPolling()
+    this.FetchUnreadCount()
+    const id = setInterval(() => {
+      this.FetchUnreadCount()
+    }, 60000)
+    this.context.commit('SET_POLLING_TIMER', id)
+  }
+
+  @Action({ rawError: true })
+  public StopUnreadPolling() {
+    if (this._unreadTimerId) {
+      clearInterval(this._unreadTimerId)
+      this.context.commit('SET_POLLING_TIMER', null)
+    }
+  }
+
+  @Mutation
+  private SET_POLLING_TIMER(id: ReturnType<typeof setInterval> | null) {
+    this._unreadTimerId = id
   }
 
   @Action({ rawError: true })

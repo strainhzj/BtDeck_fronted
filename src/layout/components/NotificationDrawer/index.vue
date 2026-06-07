@@ -84,7 +84,7 @@
     </div>
     <div class="detail-content" v-html="detailHtml" />
     <div v-if="detailReleaseUrl" class="detail-footer">
-      <a :href="detailReleaseUrl" target="_blank" class="detail-link">
+      <a :href="detailReleaseUrl" target="_blank" rel="noopener noreferrer" class="detail-link">
         <i class="el-icon-link" /> 在 GitHub 上查看完整 Release
       </a>
     </div>
@@ -106,7 +106,6 @@ import NotificationItemComp from './NotificationItem.vue'
 })
 export default class extends Vue {
   private activeTab = 'all'
-  private pollingTimer: ReturnType<typeof setInterval> | null = null
 
   // 详情弹窗状态
   private detailVisible = false
@@ -282,7 +281,9 @@ export default class extends Vue {
   }
 
   private get detailReleaseUrl(): string {
-    return this.detailExtraData?.release_url || ''
+    const url = this.detailExtraData?.release_url || ''
+    if (url && /^https?:\/\//i.test(url)) return url
+    return ''
   }
 
   private handleView(notification: NotificationItem) {
@@ -308,28 +309,12 @@ export default class extends Vue {
     this.detailExtraData = null
   }
 
-  private startPolling() {
-    // 60秒轮询未读数
-    this.pollingTimer = setInterval(() => {
-      NotificationModule.FetchUnreadCount()
-    }, 60000)
-  }
-
-  private stopPolling() {
-    if (this.pollingTimer) {
-      clearInterval(this.pollingTimer)
-      this.pollingTimer = null
-    }
-  }
-
   mounted() {
-    // 首次加载未读数
-    NotificationModule.FetchUnreadCount()
-    this.startPolling()
+    NotificationModule.StartUnreadPolling()
   }
 
   beforeDestroy() {
-    this.stopPolling()
+    // 轮询由 store 管理，无需手动清理
   }
 }
 </script>
