@@ -425,18 +425,18 @@ export default class extends Vue {
 
   .detail-time {
     font-size: 12px;
-    color: #9CA3AF;
+    color: var(--color-text-tertiary, #9CA3AF);
   }
 
   .detail-content {
     font-size: 14px;
     line-height: 1.6;
-    color: #374151;
+    color: var(--color-text-secondary, #374151);
     word-break: break-word;
 
-    h2 { font-size: 16px; margin: 12px 0 6px; font-weight: 600; color: #111827; }
-    h3 { font-size: 15px; margin: 10px 0 4px; font-weight: 600; color: #1F2937; }
-    h4 { font-size: 14px; margin: 8px 0 4px; font-weight: 600; color: #374151; }
+    h2 { font-size: 16px; margin: 12px 0 6px; font-weight: 600; color: var(--color-text-primary, #111827); }
+    h3 { font-size: 15px; margin: 10px 0 4px; font-weight: 600; color: var(--color-text-primary, #1F2937); }
+    h4 { font-size: 14px; margin: 8px 0 4px; font-weight: 600; color: var(--color-text-secondary, #374151); }
 
     p { margin: 4px 0; }
 
@@ -451,19 +451,19 @@ export default class extends Vue {
       line-height: 1.5;
     }
 
-    strong { color: #111827; }
+    strong { color: var(--color-text-primary, #111827); }
 
     code {
-      background: #F3F4F6;
+      background: var(--color-bg-secondary, #F3F4F6);
       padding: 1px 4px;
       border-radius: 3px;
       font-size: 13px;
-      color: #DC2626;
+      color: var(--color-danger, #DC2626);
     }
 
     hr {
       border: none;
-      border-top: 1px solid #E5E7EB;
+      border-top: 1px solid var(--color-border-primary, #E5E7EB);
       margin: 8px 0;
     }
   }
@@ -471,7 +471,7 @@ export default class extends Vue {
   .detail-footer {
     margin-top: 20px;
     padding-top: 16px;
-    border-top: 1px solid #E5E7EB;
+    border-top: 1px solid var(--color-border-primary, #E5E7EB);
   }
 
   .detail-link {
@@ -479,7 +479,7 @@ export default class extends Vue {
     align-items: center;
     gap: 4px;
     font-size: 13px;
-    color: #059669;
+    color: var(--color-success, #059669);
     text-decoration: none;
 
     &:hover { text-decoration: underline; }

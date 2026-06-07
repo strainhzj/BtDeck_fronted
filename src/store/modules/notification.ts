@@ -18,6 +18,7 @@ export interface INotificationState {
   page: number
   loading: boolean
   currentFilter: { page?: number, type?: string, is_read?: boolean }
+  unreadTimerId: number | null
 }
 
 @Module({ dynamic: true, store, name: 'notification' })
@@ -29,6 +30,7 @@ class Notification extends VuexModule implements INotificationState {
   public page = 1
   public loading = false
   public currentFilter: { page?: number, type?: string, is_read?: boolean } = {}
+  public unreadTimerId: number | null = null
 
   @Mutation
   private SET_DRAWER_VISIBLE(visible: boolean) {
@@ -157,8 +159,6 @@ class Notification extends VuexModule implements INotificationState {
     }
   }
 
-  private _unreadTimerId: ReturnType<typeof setInterval> | null = null
-
   @Action({ rawError: true })
   public StartUnreadPolling() {
     this.StopUnreadPolling()
@@ -166,20 +166,21 @@ class Notification extends VuexModule implements INotificationState {
     const id = setInterval(() => {
       this.FetchUnreadCount()
     }, 60000)
-    this.context.commit('SET_POLLING_TIMER', id)
+    this.SET_POLLING_TIMER(id)
   }
 
   @Action({ rawError: true })
   public StopUnreadPolling() {
-    if (this._unreadTimerId) {
-      clearInterval(this._unreadTimerId)
-      this.context.commit('SET_POLLING_TIMER', null)
+    const timerId = this.unreadTimerId
+    if (timerId) {
+      clearInterval(timerId)
+      this.SET_POLLING_TIMER(null)
     }
   }
 
   @Mutation
-  private SET_POLLING_TIMER(id: ReturnType<typeof setInterval> | null) {
-    this._unreadTimerId = id
+  private SET_POLLING_TIMER(id: number | null) {
+    this.unreadTimerId = id
   }
 
   @Action({ rawError: true })
