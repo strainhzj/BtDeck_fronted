@@ -71,7 +71,7 @@ export const STATUS_ICON_MAP: Record<string, string> = {
   seeding: '⬆️',
   downloading: '⬇️',
   paused: '⏸️',
-  queuedDL: '❓',
+  queuedDL: '⏳',
   error: '⚠️',
   checking: '🔄'
 }

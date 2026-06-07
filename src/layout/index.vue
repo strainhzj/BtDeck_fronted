@@ -13,6 +13,7 @@
       <navbar />
       <app-main />
     </div>
+    <notification-drawer />
   </div>
 </template>
 
@@ -21,6 +22,7 @@ import { Component } from 'vue-property-decorator'
 import { mixins } from 'vue-class-component'
 import { DeviceType, AppModule } from '@/store/modules/app'
 import { AppMain, Navbar, Sidebar } from './components'
+import NotificationDrawer from './components/NotificationDrawer/index.vue'
 import ResizeMixin from './mixin/resize'
 
 @Component({
@@ -28,7 +30,8 @@ import ResizeMixin from './mixin/resize'
   components: {
     AppMain,
     Navbar,
-    Sidebar
+    Sidebar,
+    NotificationDrawer
   }
 })
 export default class extends mixins(ResizeMixin) {

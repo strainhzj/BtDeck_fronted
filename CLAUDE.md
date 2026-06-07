@@ -33,6 +33,29 @@
 
 → [详细规范](./docs/constraints/vue-async-context.md)
 
+### 5. 环境变量配置一致性（强制）
+
+开发环境和生产环境的环境变量配置必须保持语义一致性，特别是API版本号。
+
+→ [详细规范](./docs/constraints/environment-consistency.md)
+
+### 6. 列表排序逻辑约束
+
+关键排序逻辑（如活跃种子优先）必须始终生效，不得因用户筛选而禁用。
+
+→ [详细规范](./docs/constraints/list-sorting.md)
+
+## 功能模块
+
+### 通知中心
+
+- **组件**: `src/layout/components/NotificationDrawer/` — 全局右侧抽屉（el-drawer）
+- **Vuex**: `src/store/modules/notification.ts` — `NotificationModule`
+- **API**: `src/api/notification.ts`
+- **触发入口**: Navbar 闹钟图标 → `NotificationModule.ToggleDrawer(true)`
+- **轮询**: 60秒轮询 `/notifications/unread-count` 更新徽章数字
+- **约束**: 通知中心是全局组件，位于 Layout 层级，不属于任何路由页面。使用 `el-drawer` 从右侧滑出，自带遮罩层。
+
 ## 项目结构
 
 ```

@@ -44,6 +44,13 @@
           :value="option.value"
         />
         </el-select>
+        <el-checkbox
+          v-model="listQuery.showActiveOnly"
+          class="active-only-checkbox"
+          @change="handleFilter"
+        >
+          仅显示活动种子
+        </el-checkbox>
         <el-button class="search-btn" @click="handleFilter">
           搜索
         </el-button>
@@ -55,6 +62,9 @@
         </el-button>
         <el-button class="clear-btn" @click="handleClearFilter">
           清空
+        </el-button>
+        <el-button class="refresh-btn" @click="handleManualRefresh" :loading="listLoading">
+          刷新
         </el-button>
       </div>
     </section>
@@ -200,6 +210,8 @@
               />
             </th>
             <th v-if="getColumnSetting('name').visible">种子名称</th>
+            <th v-if="getColumnSetting('downloadSpeed').visible" style="width: 100px;">下载速度</th>
+            <th v-if="getColumnSetting('uploadSpeed').visible" style="width: 100px;">上传速度</th>
             <th v-if="getColumnSetting('size').visible" style="width: 100px;">大小</th>
             <th v-if="getColumnSetting('progress').visible" style="width: 140px;">进度</th>
             <th v-if="getColumnSetting('status').visible" style="width: 90px;">状态</th>
@@ -213,7 +225,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="(torrent, index) in list"
+            v-for="(torrent, index) in sortedList"
             :key="`${torrent.hash}-${torrent.downloaderId || torrent.downloader_id}-${index}`"
             :class="{selected: currentRow?.hash === torrent.hash}"
             @click="handleRowClick(torrent)"
@@ -238,6 +250,12 @@
                 </div>
               </div>
             </td>
+            <td v-if="getColumnSetting('downloadSpeed').visible">
+              <span class="speed-value download">{{ formatSpeed(getTorrentSpeed(torrent, 'download')) }}</span>
+            </td>
+            <td v-if="getColumnSetting('uploadSpeed').visible">
+              <span class="speed-value upload">{{ formatSpeed(getTorrentSpeed(torrent, 'upload')) }}</span>
+            </td>
             <td v-if="getColumnSetting('size').visible">{{ formatFileSize(torrent.size) }}</td>
             <td v-if="getColumnSetting('progress').visible">
               <div class="progress-wrapper">
@@ -249,8 +267,8 @@
                 </div>
                 <div class="progress-text">
                   {{ torrent.progress || 0 }}%
-                  <span v-if="torrent.downloadSpeed || torrent.uploadSpeed">
-                    • {{ formatSpeed(torrent.downloadSpeed || torrent.uploadSpeed) }}
+                  <span v-if="getTorrentSpeed(torrent, 'download') || getTorrentSpeed(torrent, 'upload')">
+                    • {{ formatSpeed(getTorrentSpeed(torrent, 'download') || getTorrentSpeed(torrent, 'upload')) }}
                   </span>
                 </div>
               </div>
@@ -569,7 +587,8 @@ import {
   getDuplicateTorrents,
   getDownloaderList,
   DownloaderSimple,
-  reannounceTorrents
+  reannounceTorrents,
+  getActiveTorrents
 } from '@/api/torrents'
 import { TorrentStatus } from '@/types/torrent'
 import { STATUS_OPTIONS, getStatusIcon, getStatusText } from '@/constants/status-config'
@@ -612,6 +631,11 @@ export default class extends Vue {
   private total = 0
   private listLoading = true
   private multipleSelection: any[] = []
+
+  // 实时速度轮询
+  private speedTimer: number | null = null
+  private _isDestroyed = false
+  private activeSpeedMap: Record<string, { downloadSpeed: number, uploadSpeed: number, progress: number }> = {}
 
   // 分页相关
   private currentPage = 1
@@ -682,6 +706,7 @@ export default class extends Vue {
     name_like: '',
     downloader_id: [] as string[],  // 支持多选
     status: [] as string[],         // 支持多选
+    showActiveOnly: false,          // 仅显示活动种子（有速度的种子）
     sort_by: 'added_date',
     sort_order: 'desc'
   }
@@ -689,6 +714,8 @@ export default class extends Vue {
   // 列设置
   private columnSettings = [
     { key: 'name', label: '种子名称', visible: true },
+    { key: 'downloadSpeed', label: '下载速度', visible: true },
+    { key: 'uploadSpeed', label: '上传速度', visible: true },
     { key: 'size', label: '大小', visible: true },
     { key: 'progress', label: '进度', visible: true },
     { key: 'status', label: '状态', visible: true },
@@ -744,6 +771,15 @@ export default class extends Vue {
     await this.getDownloaderList()
     await this.getList()
     this.loadUserPreferences()
+    this.startSpeedPolling()
+  }
+
+  beforeDestroy() {
+    try {
+      this.stopSpeedPolling()
+    } catch (e) {
+      console.error('[速度轮询] 清理定时器失败:', e)
+    }
   }
 
   // 主题切换
@@ -757,6 +793,12 @@ export default class extends Vue {
     this.listLoading = true
     try {
       const params = { ...this.listQuery }
+
+      // 检查是否需要前端过滤"活动"种子
+      const showActiveOnly = params.showActiveOnly === true
+
+      // 移除 showActiveOnly 属性，不发送给后端
+      delete params.showActiveOnly
 
       // 处理数组参数：转换为逗号分隔的字符串
       if (params.downloader_id && Array.isArray(params.downloader_id)) {
@@ -778,14 +820,23 @@ export default class extends Vue {
 
       // 使用统一的响应处理工具
       const { list, total } = normalizePaginatedResponse<any>(response)
-      
+
       // 规范化种子数据并提供默认值
-      this.list = list.map(normalizeTorrent).map(item => ({
+      let normalizedList = list.map(normalizeTorrent).map(item => ({
         ...item,
         checked: false
       }))
-      
-      this.total = total
+
+      // 前端过滤"仅显示活动种子"：筛选出有速度的种子
+      if (showActiveOnly) {
+        normalizedList = normalizedList.filter(item => {
+          const speed = this.activeSpeedMap[item.hash]
+          return speed && (speed.downloadSpeed > 0 || speed.uploadSpeed > 0)
+        })
+      }
+
+      this.list = normalizedList
+      this.total = showActiveOnly ? normalizedList.length : total
     } catch (error) {
       const errorMessage = extractErrorMessage(error)
       console.error('获取种子列表失败:', error)
@@ -830,6 +881,12 @@ export default class extends Vue {
       sort_order: 'desc'
     }
     this.getList()
+  }
+
+  // 手动刷新（静态数据 + 速度数据同时刷新）
+  private handleManualRefresh() {
+    this.getList()
+    this.loadActiveSpeed()
   }
 
   // 分页切换
@@ -1941,6 +1998,101 @@ export default class extends Vue {
     return formatSpeed(speed)
   }
 
+  // ==================== 实时速度轮询 ====================
+
+  /** 用户是否正在使用筛选条件（搜索/筛选时禁用速度排序） */
+  private get isUserFiltering(): boolean {
+    const q = this.listQuery
+    return !!(
+      (q.name_like && q.name_like.trim() !== '') ||
+      (q.downloader_id && q.downloader_id.length > 0) ||
+      (q.status && q.status.length > 0)
+    )
+  }
+
+  /** 排序后的列表（活跃种子优先，始终生效） */
+  private get sortedList(): any[] {
+    if (!this.list || this.list.length === 0) return []
+    return [...this.list].sort((a, b) => {
+      const aSpeed = this.getTorrentSpeed(a, 'download') || this.getTorrentSpeed(a, 'upload') || 0
+      const bSpeed = this.getTorrentSpeed(b, 'download') || this.getTorrentSpeed(b, 'upload') || 0
+      const aActive = aSpeed > 0 ? 1 : 0
+      const bActive = bSpeed > 0 ? 1 : 0
+      if (aActive !== bActive) return bActive - aActive
+      if (aActive === 1) return bSpeed - aSpeed
+      return 0
+    })
+  }
+
+  /** 获取种子的实时显示速度（优先使用轮询数据，降级使用静态数据） */
+  private getTorrentSpeed(torrent: any, type: 'download' | 'upload'): number | null {
+    const active = this.activeSpeedMap[torrent.hash]
+    if (active) {
+      return type === 'download' ? active.downloadSpeed : active.uploadSpeed
+    }
+    return type === 'download' ? (torrent.downloadSpeed ?? null) : (torrent.uploadSpeed ?? null)
+  }
+
+  /** 加载活跃种子实时速度和进度 */
+  private async loadActiveSpeed() {
+    const requestId = Date.now()
+
+    try {
+      const res = await getActiveTorrents()
+      if (res.code === '200' && res.data) {
+        const map: Record<string, { downloadSpeed: number, uploadSpeed: number, progress: number }> = {}
+        const torrents = res.data as ActiveTorrentSpeed[]
+        torrents.forEach((t: ActiveTorrentSpeed) => {
+          // 防御性检查：确保hash字段存在
+          if (!t.hash) {
+            console.warn('[速度轮询] 跳过无效种子数据:', t)
+            return
+          }
+          // 更新速度映射（用于排序和高亮）
+          map[t.hash] = {
+            downloadSpeed: t.downloadSpeed ?? 0,
+            uploadSpeed: t.uploadSpeed ?? 0,
+            progress: t.progress ?? 0
+          }
+
+          // 直接更新列表中对应种子的实时数据
+          const torrentInList = this.list.find(item => item.hash === t.hash)
+          if (torrentInList) {
+            torrentInList.downloadSpeed = t.downloadSpeed ?? 0
+            torrentInList.uploadSpeed = t.uploadSpeed ?? 0
+            torrentInList.progress = t.progress ?? 0
+          }
+        })
+        this.activeSpeedMap = map
+        console.debug(`[速度轮询] 请求 ${requestId} 完成，更新 ${Object.keys(map).length} 个活跃种子`)
+      }
+    } catch (e) {
+      // 静默失败，不影响主流程
+      console.debug(`[速度轮询] 请求 ${requestId} 失败:`, e)
+    }
+  }
+
+  /** 启动速度轮询（请求完成后等待1秒再发下一次） */
+  private startSpeedPolling() {
+    this._isDestroyed = false
+    const poll = async() => {
+      await this.loadActiveSpeed()
+      // 组件已销毁时不再调度下一次
+      if (this._isDestroyed) return
+      this.speedTimer = window.setTimeout(poll, 1000)
+    }
+    poll()
+  }
+
+  /** 停止速度轮询 */
+  private stopSpeedPolling() {
+    this._isDestroyed = true
+    if (this.speedTimer) {
+      clearTimeout(this.speedTimer)
+      this.speedTimer = null
+    }
+  }
+
   private formatDate(timestamp: number | string | null | undefined): string {
     return formatDate(timestamp)
   }
@@ -2046,6 +2198,21 @@ export default class extends Vue {
   // 优化下拉框宽度自适应
   ::v-deep .el-select__tags {
     max-width: calc(100% - 30px);
+  }
+}
+
+// 活动种子复选框样式
+.active-only-checkbox {
+  margin-left: 12px;
+  margin-right: 12px;
+
+  ::v-deep .el-checkbox__label {
+    color: var(--color-text-primary);
+    font-size: 14px;
+  }
+
+  ::v-deep .el-checkbox__input.is-checked + .el-checkbox__label {
+    color: var(--color-accent-primary);
   }
 }
 
@@ -2235,6 +2402,28 @@ export default class extends Vue {
 }
 
 // ========================================
+// 刷新按钮样式（白色按钮）
+// ========================================
+.refresh-btn {
+  background: white !important;
+  color: var(--color-text-primary) !important;
+  border: 1px solid var(--color-border-primary) !important;
+  transition: all var(--transition-base) ease;
+
+  &:hover:not(:disabled) {
+    background: var(--color-bg-secondary) !important;
+    border-color: var(--color-border-secondary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// ========================================
 // 操作按钮样式
 // ========================================
 .action-buttons {
@@ -2281,6 +2470,29 @@ export default class extends Vue {
 
   &.delete {
     color: #F56C6C;
+  }
+}
+
+// ========================================
+// 速度列样式
+// ========================================
+.speed-value {
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  color: var(--color-text-secondary);
+
+  &.download::before {
+    content: '▼';
+    margin-right: 2px;
+    font-size: 10px;
+    opacity: 0.6;
+  }
+
+  &.upload::before {
+    content: '▲';
+    margin-right: 2px;
+    font-size: 10px;
+    opacity: 0.6;
   }
 }
 </style>

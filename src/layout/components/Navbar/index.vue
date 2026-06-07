@@ -14,12 +14,12 @@
 
     <!-- 右侧区域 -->
     <div class="navbar-right">
-      <!-- 全局搜索 -->
+      <!-- 反馈按钮 -->
       <el-button
-        class="icon-button"
-        icon="el-icon-search"
+        class="icon-button feedback-button"
+        icon="el-icon-chat-dot-round"
         circle
-        @click="handleSearch"
+        @click="handleFeedback"
       />
 
       <!-- 通知中心 -->
@@ -66,6 +66,7 @@
 <script lang="ts">
 import { Component, Vue } from 'vue-property-decorator'
 import { UserModule } from '@/store/modules/user'
+import { NotificationModule } from '@/store/modules/notification'
 import Breadcrumb from '@/components/Breadcrumb/index.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher/index.vue'
 
@@ -77,8 +78,6 @@ import ThemeSwitcher from '@/components/ThemeSwitcher/index.vue'
   }
 })
 export default class extends Vue {
-  private notificationCount = 3 // 示例通知数量
-
   get avatar() {
     return UserModule.avatar
   }
@@ -87,12 +86,17 @@ export default class extends Vue {
     return UserModule.name || '管理员'
   }
 
-  private handleSearch() {
-    this.$message.info('全局搜索功能开发中...')
+  get notificationCount() {
+    return NotificationModule.unreadCount
   }
 
   private handleNotification() {
-    this.$message.info('通知中心功能开发中...')
+    NotificationModule.ToggleDrawer(true)
+  }
+
+  private handleFeedback() {
+    const win = window.open('https://github.com/strainhzj/BtDeck/issues', '_blank', 'noopener,noreferrer')
+    if (win) win.opener = null
   }
 
   private handleUserAction(command: string) {
@@ -215,6 +219,8 @@ export default class extends Vue {
   ::v-deep .el-badge__content {
     background-color: var(--color-error, #EF4444);
     border-color: var(--color-error, #EF4444);
+    top: 12px;
+    right: 8px;
   }
 }
 
